@@ -1,0 +1,15 @@
+# Core
+psycopg2-binary==2.9.9       # PostgreSQL driver
+python-dotenv==1.0.0          # Load .env for DB credentials
+
+# Data pipeline
+requests==2.31.0              # Kilter / Moon Board API calls
+pandas==2.1.4                 # Data wrangling during sync
+
+# ML (Phase 2 — install when ready)
+# scikit-learn==1.4.0
+# xgboost==2.0.3
+# mediapipe==0.10.9           # Pose estimation from video
+
+# Dev / testing
+pytest==7.4.4
