@@ -60,3 +60,8 @@ psql climbing_platform < db/seed.sql
 - **JSONB for raw_landmarks** — MediaPipe returns 33 landmarks per frame. Storing as JSONB lets you reprocess with updated models without a schema change.
 - **Computed stats table** — `climber_move_stats` is a pre-aggregated table, not a view, for fast dashboard queries. It gets refreshed by a background job after each session.
 - **board_type + source fields** — designed to support Kilter, Moon Board, and future custom boards without schema changes.
+
+## Data Sources
+- Kilter Board route data: downloaded via [BoardLib](https://github.com/lemeryfertitta/BoardLib)
+- Hold type labels: [Climbology project](https://github.com/Rundstedtzz/climbology) (MIT License) — manually annotated hold types (crimp/sloper/jug/pinch) for the Kilter Original layout
+
