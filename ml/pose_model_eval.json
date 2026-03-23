@@ -1,0 +1,24 @@
+{
+  "n_routes": 310,
+  "n_features": 13,
+  "feature_cols": [
+    "pose_avg_shoulder_l",
+    "pose_min_elbow_r",
+    "pose_peak_com_vel",
+    "pose_max_hip_spread",
+    "pose_avg_com_to_hands",
+    "pose_avg_tension",
+    "pose_p90_tension",
+    "pose_pct_straight_l",
+    "pose_avg_elbow_l",
+    "pose_avg_elbow_r",
+    "pose_p10_hip_angle",
+    "pose_avg_hip_angle",
+    "pose_hip_angle_range"
+  ],
+  "best_model": "XGBoost",
+  "mae_difficulty": 2.543,
+  "mae_vgrades": 1.16,
+  "cv_method": "5-fold CV",
+  "note": "Trained on 310 routes. Accuracy will improve with more scraped beta videos."
+}

@@ -5,11 +5,19 @@ python-dotenv==1.0.0          # Load .env for DB credentials
 # Data pipeline
 requests==2.31.0              # Kilter / Moon Board API calls
 pandas==2.1.4                 # Data wrangling during sync
+yt-dlp>=2024.0                # Beta video download (Instagram, TikTok)
 
-# ML (Phase 2 — install when ready)
-# scikit-learn==1.4.0
-# xgboost==2.0.3
-# mediapipe==0.10.9           # Pose estimation from video
+# ML
+scikit-learn>=1.2.0
+xgboost>=2.0.0
+numpy<2                        # MediaPipe 0.10.x requires numpy<2
+mediapipe>=0.10.0              # Pose estimation: 33 body landmarks, Tasks API
+opencv-python>=4.8.0           # Video frame extraction for pose pipeline
+
+# API
+flask>=3.0.0
+flask-cors>=4.0.0
+python-docx>=1.1.0
 
 # Dev / testing
 pytest==7.4.4

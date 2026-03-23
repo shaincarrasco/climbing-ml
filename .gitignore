@@ -1,3 +1,13 @@
+# Project-specific ignores
+kilter.db
+kilter_images/
+data/
+*.task
+Youtube Videos/
+climbing_ml_tracker.docx
+.DS_Store
+**/.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

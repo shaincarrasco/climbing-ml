@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kilter Intelligence</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <div class="nav-logo">KILTER<span>·</span>INTELLIGENCE</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('explore')">Explore</button>
+    <button class="nav-tab" onclick="switchTab('creator')">Creator</button>
+    <button class="nav-tab" onclick="switchTab('profile')">Profile</button>
+  </div>
+  <div class="nav-stats" id="nav-stats">Loading…</div>
+</nav>
+
+<!-- ── APP BODY ── -->
+<div class="app-body">
+
+  <!-- ══════ EXPLORE TAB ══════ -->
+  <div data-tab-view="explore" class="active" style="flex-direction:row;">
+
+    <!-- Left: route list -->
+    <div class="left-panel">
+      <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <span class="panel-title">Routes</span>
+        <span id="route-count" style="font-size:10px;color:var(--mist);font-family:'Space Mono',monospace;"></span>
+      </div>
+      <div class="search-box">
+        <input class="search-input" id="route-search" placeholder="Search routes…" oninput="debounceSearch()">
+      </div>
+      <div class="filter-row" id="grade-filters">
+        <button class="filter-chip active" onclick="filterGrade(this,'')">All</button>
+        <button class="filter-chip" onclick="filterGrade(this,'V0')">V0</button>
+        <button class="filter-chip" onclick="filterGrade(this,'V3')">V3</button>
+        <button class="filter-chip" onclick="filterGrade(this,'V5')">V5</button>
+        <button class="filter-chip" onclick="filterGrade(this,'V7')">V7</button>
+        <button class="filter-chip" onclick="filterGrade(this,'V10')">V10</button>
+        <button class="filter-chip" id="beta-filter-btn" onclick="toggleBetaFilter(this)" title="Show only routes with beta video data">BETA</button>
+      </div>
+      <div class="panel-scroll" id="route-list">
+        <div class="loading-overlay" style="position:relative;height:200px;">
+          <div class="spinner"></div>
+          <span class="loading-text">Loading routes…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: board -->
+    <div class="board-area">
+      <!-- Row 1: board type + set -->
+      <div class="board-toolbar" style="border-bottom:none;padding-bottom:6px;">
+        <span class="angle-label">BOARD</span>
+        <div class="angle-btns" id="board-switcher">
+          <button class="angle-btn active" onclick="switchBoard('original')">Original</button>
+          <button class="angle-btn" onclick="switchBoard('homewall')">Homewall</button>
+        </div>
+        <div class="toolbar-sep"></div>
+        <span class="angle-label">SET</span>
+        <div class="angle-btns" id="set-switcher">
+          <button class="filter-chip active" onclick="switchSet('all')">All</button>
+        </div>
+        <div class="toolbar-sep"></div>
+        <span id="board-char-desc" style="font-size:10px;color:var(--mist);max-width:260px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;"></span>
+      </div>
+      <!-- Row 2: angle + legend -->
+      <div class="board-toolbar">
+        <span class="angle-label">ANGLE</span>
+        <div class="angle-btns" id="angle-btns">
+          <button class="angle-btn" onclick="setAngle(0)">0°</button>
+          <button class="angle-btn" onclick="setAngle(20)">20°</button>
+          <button class="angle-btn" onclick="setAngle(35)">35°</button>
+          <button class="angle-btn active" onclick="setAngle(40)">40°</button>
+          <button class="angle-btn" onclick="setAngle(45)">45°</button>
+          <button class="angle-btn" onclick="setAngle(50)">50°</button>
+          <button class="angle-btn" onclick="setAngle(55)">55°</button>
+          <button class="angle-btn" onclick="setAngle(60)">60°</button>
+          <button class="angle-btn" onclick="setAngle(65)">65°</button>
+          <button class="angle-btn" onclick="setAngle(70)">70°</button>
+        </div>
+        <div class="toolbar-sep"></div>
+        <div class="hold-legend">
+          <div class="legend-item" onclick="toggleType('jug')"><div class="legend-dot" style="background:var(--hold-jug)"></div>Jug</div>
+          <div class="legend-item" onclick="toggleType('crimp')"><div class="legend-dot" style="background:var(--hold-crimp)"></div>Crimp</div>
+          <div class="legend-item" onclick="toggleType('sloper')"><div class="legend-dot" style="background:var(--hold-sloper)"></div>Sloper</div>
+          <div class="legend-item" onclick="toggleType('pinch')"><div class="legend-dot" style="background:var(--hold-pinch)"></div>Pinch</div>
+          <div class="legend-item" onclick="toggleType('foot')"><div class="legend-dot" style="background:var(--hold-foot)"></div>Foot</div>
+        </div>
+      </div>
+      <!-- Row 3: live type counts -->
+      <div style="padding:4px 16px 6px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;" id="type-counts"></div>
+
+      <div class="board-wrapper">
+        <div class="loading-overlay" id="board-loading">
+          <div class="spinner"></div>
+          <span class="loading-text">Loading board…</span>
+        </div>
+        <div class="board-container" id="board" data-angle="40">
+          <svg class="arrows-overlay" id="arrows-svg"></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: route detail + stick figure -->
+    <div class="right-panel">
+      <div class="panel-header"><span class="panel-title">Route Detail</span></div>
+      <div class="panel-scroll" id="route-detail">
+        <div class="empty-state">
+          <div class="big">→</div>
+          Select a route to see its holds and stats
+        </div>
+      </div>
+
+      <!-- Beta preview panel -->
+      <div class="figure-panel" id="route-figure-panel" style="display:none;">
+        <div class="figure-panel-title">Beta Preview</div>
+        <div class="figure-svg-wrap">
+          <svg id="stick-figure-svg" width="120" height="170" viewBox="0 0 140 210"></svg>
+        </div>
+        <div class="figure-metrics" id="figure-metrics"></div>
+
+        <!-- COM sparkline -->
+        <div class="sparkline-wrap" id="sparkline-wrap" style="display:none;">
+          <span class="sparkline-label">COM HEIGHT</span>
+          <svg id="com-sparkline" width="100%" height="32"></svg>
+          <div id="sparkline-cursor" style="left:0;"></div>
+        </div>
+
+        <!-- Scrubber -->
+        <div class="pose-scrubber-wrap" id="scrubber-wrap" style="display:none;">
+          <input type="range" class="pose-scrubber" id="pose-scrubber"
+                 min="0" value="0" disabled
+                 oninput="seekPoseFrame(+this.value)" onmousedown="stopPosePlay()" ontouchstart="stopPosePlay()">
+          <span class="scrubber-ts" id="scrubber-ts">0.0s</span>
+        </div>
+
+        <button class="play-btn" id="pose-play-btn" onclick="togglePosePlay()" disabled>▶ Play Beta</button>
+        <div class="frame-counter" id="pose-frame-counter"></div>
+        <div class="kbd-hint" id="kbd-hint" style="display:none;">SPACE play/pause · ← → step frames</div>
+      </div>
+    </div>
+
+  </div><!-- /explore -->
+
+  <!-- ══════ CREATOR TAB ══════ -->
+  <div data-tab-view="creator" style="flex-direction:row;">
+
+    <!-- Left: controls -->
+    <div class="left-panel">
+      <div class="panel-header"><span class="panel-title">Route Builder</span></div>
+
+      <!-- Role selector -->
+      <div class="creator-section">
+        <div class="creator-label">Placing Role</div>
+        <div class="role-btns">
+          <button class="role-btn active" data-role="start"  onclick="setRole('start')">Start</button>
+          <button class="role-btn"        data-role="hand"   onclick="setRole('hand')">Hand</button>
+          <button class="role-btn"        data-role="foot"   onclick="setRole('foot')">Foot</button>
+          <button class="role-btn"        data-role="finish" onclick="setRole('finish')">Finish</button>
+        </div>
+        <div class="pf-status warn" id="pf-status">
+          Place at least <b>1 start hold</b> to begin.
+        </div>
+      </div>
+
+      <!-- Hold counts -->
+      <div class="hold-counts" id="hold-counts">
+        <div class="hc-chip">Start <b id="ct-start">0</b></div>
+        <div class="hc-chip">Hand <b id="ct-hand">0</b></div>
+        <div class="hc-chip">Foot <b id="ct-foot">0</b></div>
+        <div class="hc-chip">Finish <b id="ct-finish">0</b>/1</div>
+      </div>
+
+      <!-- Grade meter -->
+      <div class="grade-meter">
+        <div class="creator-label">Predicted Grade</div>
+        <div class="grade-display">
+          <div class="grade-big" id="pred-grade">—</div>
+          <div class="grade-conf" id="pred-conf"></div>
+        </div>
+        <div class="grade-bar-track">
+          <div class="grade-bar-fill" id="grade-bar-fill"></div>
+        </div>
+        <div class="grade-ticks">
+          <span>V0</span><span>V4</span><span>V8</span><span>V12</span><span>V14</span>
+        </div>
+      </div>
+
+      <!-- DNA bars -->
+      <div class="dna-section">
+        <div class="creator-label">Route DNA</div>
+        <div class="dna-row"><span class="dna-label">Reach</span>     <div class="dna-track"><div class="dna-fill dna-reach"      id="dna-reach"      style="width:0%"></div></div><span class="dna-val" id="dna-reach-v">0</span></div>
+        <div class="dna-row"><span class="dna-label">Sustained</span> <div class="dna-track"><div class="dna-fill dna-sustained"  id="dna-sustained"  style="width:0%"></div></div><span class="dna-val" id="dna-sustained-v">0</span></div>
+        <div class="dna-row"><span class="dna-label">Dynamic</span>   <div class="dna-track"><div class="dna-fill dna-dynamic"    id="dna-dynamic"    style="width:0%"></div></div><span class="dna-val" id="dna-dynamic-v">0</span></div>
+        <div class="dna-row"><span class="dna-label">Lateral</span>   <div class="dna-track"><div class="dna-fill dna-lateral"    id="dna-lateral"    style="width:0%"></div></div><span class="dna-val" id="dna-lateral-v">0</span></div>
+        <div class="dna-row"><span class="dna-label">Complexity</span><div class="dna-track"><div class="dna-fill dna-complexity" id="dna-complexity" style="width:0%"></div></div><span class="dna-val" id="dna-complexity-v">0</span></div>
+        <div class="dna-row"><span class="dna-label">Power</span>     <div class="dna-track"><div class="dna-fill dna-power"      id="dna-power"      style="width:0%"></div></div><span class="dna-val" id="dna-power-v">0</span></div>
+      </div>
+
+      <!-- Auto-Generate -->
+      <div class="creator-section" style="border-top:1px solid var(--border);padding-top:10px;">
+        <div class="creator-label">Auto-Generate Route</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="font-size:10px;color:var(--mist);min-width:38px;">Easy</span>
+          <input type="range" id="auto-difficulty" min="0" max="1" step="0.05" value="0.4" style="flex:1;">
+          <span style="font-size:10px;color:var(--mist);min-width:36px;text-align:right;">Hard</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="font-size:10px;color:var(--mist);min-width:38px;">Holds:</span>
+          <input type="range" id="auto-hold-count" min="5" max="14" step="1" value="8" style="flex:1;">
+          <span style="font-size:10px;color:var(--mist);min-width:36px;text-align:right;" id="auto-count-lbl">8</span>
+        </div>
+        <button class="btn btn-primary" id="btn-auto-generate" onclick="autoGenerate()" style="width:100%;margin-bottom:0;">Auto-Generate</button>
+      </div>
+
+      <!-- Actions -->
+      <div class="creator-actions">
+        <button class="btn btn-primary" onclick="saveDraftRoute()">Save Route</button>
+        <button class="btn btn-ghost"   onclick="toggleSuggestions()">Suggest Holds</button>
+        <button class="btn btn-danger"  onclick="clearCreator()">Clear</button>
+      </div>
+
+      <!-- Start position preview -->
+      <div class="figure-panel" style="padding-top:12px;">
+        <div class="figure-panel-title">Start Position</div>
+        <div class="figure-svg-wrap">
+          <svg id="creator-figure-svg" width="120" height="180" viewBox="0 0 120 180"></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: board -->
+    <div class="board-area" id="creator-board-area" style="position:relative;">
+      <div class="board-toolbar">
+        <span class="angle-label">ANGLE</span>
+        <div class="angle-btns" id="creator-angle-btns">
+          <button class="angle-btn" onclick="setCreatorAngle(0)">0°</button>
+          <button class="angle-btn" onclick="setCreatorAngle(20)">20°</button>
+          <button class="angle-btn" onclick="setCreatorAngle(35)">35°</button>
+          <button class="angle-btn active" onclick="setCreatorAngle(40)">40°</button>
+          <button class="angle-btn" onclick="setCreatorAngle(45)">45°</button>
+          <button class="angle-btn" onclick="setCreatorAngle(50)">50°</button>
+          <button class="angle-btn" onclick="setCreatorAngle(55)">55°</button>
+          <button class="angle-btn" onclick="setCreatorAngle(60)">60°</button>
+          <button class="angle-btn" onclick="setCreatorAngle(65)">65°</button>
+          <button class="angle-btn" onclick="setCreatorAngle(70)">70°</button>
+        </div>
+        <div class="toolbar-sep"></div>
+        <span style="font-size:11px;color:var(--mist);margin-left:auto;">Click hold to place · Click again to remove · Hover to preview position</span>
+      </div>
+      <div class="board-wrapper">
+        <div class="board-container" id="creator-board" data-angle="40">
+          <svg class="arrows-overlay" id="creator-arrows-svg"></svg>
+        </div>
+      </div>
+      <!-- Hover preview (positioned absolute inside creator-board-area) -->
+      <div id="hold-hover-preview">
+        <svg id="hover-figure-svg" width="80" height="120" viewBox="0 0 80 120"></svg>
+        <div class="preview-label"></div>
+      </div>
+    </div>
+
+    <!-- Right: move sequence -->
+    <div class="right-panel">
+      <div class="panel-header"><span class="panel-title">Move Sequence</span></div>
+      <div class="panel-scroll">
+        <div class="move-seq">
+          <div class="creator-label">Holds Placed</div>
+          <div class="move-chips" id="creator-move-chips">
+            <div style="font-size:11px;color:var(--mist);">No holds placed yet.</div>
+          </div>
+        </div>
+        <div style="padding:12px 16px;border-top:1px solid var(--border);">
+          <div class="creator-label" style="margin-bottom:6px;">Hold Type Breakdown</div>
+          <div id="creator-type-breakdown" style="font-size:11px;color:var(--mist);">—</div>
+        </div>
+        <div style="padding:12px 16px;border-top:1px solid var(--border);">
+          <div class="creator-label" style="margin-bottom:6px;">Suggested Next Holds</div>
+          <div id="suggest-list" style="font-size:11px;color:var(--mist);">
+            Use "Suggest Holds" to see recommendations.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /creator -->
+
+  <!-- ══════ PROFILE TAB ══════ -->
+  <div data-tab-view="profile" style="flex-direction:column;overflow:auto;">
+    <div class="body-analytics">
+
+      <!-- Hero stats -->
+      <div class="profile-hero" id="profile-hero">
+        <div class="hero-stat">
+          <div class="big-num green" id="hero-exact-match">—</div>
+          <div class="hero-lbl">V-Grade Match</div>
+          <div class="hero-sub">exact matches</div>
+        </div>
+        <div class="hero-stat">
+          <div class="big-num" id="hero-mae-vgrade">—</div>
+          <div class="hero-lbl">Avg Error</div>
+          <div class="hero-sub">V-grades off</div>
+        </div>
+        <div class="hero-stat">
+          <div class="big-num amber" id="hero-routes">—</div>
+          <div class="hero-lbl">Routes</div>
+          <div class="hero-sub">with pose data</div>
+        </div>
+        <div class="hero-stat">
+          <div class="big-num purple" id="hero-frames">—</div>
+          <div class="hero-lbl">Pose Frames</div>
+          <div class="hero-sub">total extracted</div>
+        </div>
+      </div>
+
+      <!-- Climber profile inputs -->
+      <div class="climber-profile-section">
+        <div class="ba-title">Your Measurements</div>
+        <div class="profile-inputs-grid">
+          <div class="profile-input-group">
+            <label class="profile-input-label">Height</label>
+            <input class="profile-input" id="p-height" type="number" placeholder="cm" min="140" max="230" oninput="updateDerived()">
+          </div>
+          <div class="profile-input-group">
+            <label class="profile-input-label">Wingspan</label>
+            <input class="profile-input" id="p-wingspan" type="number" placeholder="cm" min="140" max="250" oninput="updateDerived()">
+          </div>
+          <div class="profile-input-group">
+            <label class="profile-input-label">Weight</label>
+            <input class="profile-input" id="p-weight" type="number" placeholder="kg" min="40" max="160" oninput="updateDerived()">
+          </div>
+          <div class="profile-input-group">
+            <label class="profile-input-label">Experience</label>
+            <select class="profile-select" id="p-experience" onchange="saveClimberProfile()">
+              <option value="">Select…</option>
+              <option value="beginner">Beginner (V0–V3)</option>
+              <option value="intermediate">Intermediate (V4–V6)</option>
+              <option value="advanced">Advanced (V7–V9)</option>
+              <option value="elite">Elite (V10+)</option>
+            </select>
+          </div>
+          <div class="profile-input-group">
+            <label class="profile-input-label">On-sight Grade</label>
+            <select class="profile-select" id="p-onsight" onchange="saveClimberProfile()">
+              <option value="">Select…</option>
+              <option>V0</option><option>V1</option><option>V2</option>
+              <option>V3</option><option>V4</option><option>V5</option>
+              <option>V6</option><option>V7</option><option>V8</option>
+              <option>V9</option><option>V10</option><option>V11</option>
+              <option>V12</option><option>V13</option><option>V14</option>
+            </select>
+          </div>
+          <div class="profile-input-group">
+            <label class="profile-input-label">Units</label>
+            <select class="profile-select" id="p-units" onchange="toggleUnits()">
+              <option value="metric">Metric (cm/kg)</option>
+              <option value="imperial">Imperial (in/lbs)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Derived stats -->
+        <div class="profile-derived" id="profile-derived">
+          <div class="profile-derived-item">
+            <div class="profile-derived-val" id="pd-ape">—</div>
+            <div class="profile-derived-lbl">Ape Index</div>
+          </div>
+          <div class="profile-derived-item">
+            <div class="profile-derived-val" id="pd-bmi">—</div>
+            <div class="profile-derived-lbl">BMI</div>
+          </div>
+          <div class="profile-derived-item">
+            <div class="profile-derived-val" id="pd-reach">—</div>
+            <div class="profile-derived-lbl">Reach Rating</div>
+          </div>
+        </div>
+
+        <div class="profile-save-row">
+          <button class="btn btn-primary" onclick="saveClimberProfile()" style="padding:7px 18px;font-size:11px;">Save</button>
+          <span class="profile-saved-msg" id="profile-saved-msg">Saved!</span>
+        </div>
+      </div>
+
+      <!-- Body model + stats -->
+      <div class="ba-row" style="flex:none;">
+        <div class="ba-figure-col">
+          <div class="figure-panel-title">Body Model</div>
+          <div class="figure-svg-wrap" style="width:200px;">
+            <svg id="beta-figure-svg" width="160" height="240" viewBox="0 0 160 240"></svg>
+          </div>
+          <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--mist);text-align:center;line-height:1.8;">
+            <span style="color:var(--teal);">■</span> Left &nbsp;
+            <span style="color:var(--coral);">■</span> Right &nbsp;
+            <span style="color:var(--chalk);">■</span> Spine
+          </div>
+        </div>
+
+        <div class="ba-stats-col">
+          <div class="ba-title">Body Analytics</div>
+          <div class="ba-subtitle">
+            Run <code style="font-family:'Space Mono',monospace;font-size:10px;color:var(--teal);">pipeline/pose_extractor.py</code>
+            on climbing videos to populate body metrics. The model extracts 17 joints at ~10 fps
+            and stores hip angles, arm reach, COM height, and tension score per frame.
+          </div>
+
+          <div class="ba-stat-grid" id="profile-stats-grid">
+            <div class="ba-stat-box"><div class="val" id="ps-total-frames">0</div><div class="lbl">Total Frames</div></div>
+            <div class="ba-stat-box"><div class="val" id="ps-total-attempts">0</div><div class="lbl">Attempts Tagged</div></div>
+            <div class="ba-stat-box"><div class="val" id="ps-avg-tension">—</div><div class="lbl">Avg Tension</div></div>
+            <div class="ba-stat-box"><div class="val" id="ps-avg-hip">—</div><div class="lbl">Avg Hip Angle</div></div>
+            <div class="ba-stat-box"><div class="val" id="ps-avg-reach">—</div><div class="lbl">Avg Arm Reach</div></div>
+            <div class="ba-stat-box"><div class="val" id="ps-avg-com">—</div><div class="lbl">Avg COM Height</div></div>
+          </div>
+
+          <!-- Quick commands -->
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;color:var(--mist);margin-bottom:8px;">QUICK COMMANDS</div>
+            <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--chalk);line-height:2.2;">
+              <div><span style="color:var(--mist);"># Single video</span></div>
+              <div>python3 pipeline/pose_extractor.py \</div>
+              <div>&nbsp;&nbsp;--video clip.mp4 --attempt-id &lt;uuid&gt;</div>
+              <div style="margin-top:4px;"><span style="color:var(--mist);"># Batch directory</span></div>
+              <div>python3 pipeline/pose_extractor.py \</div>
+              <div>&nbsp;&nbsp;--video-dir ./videos/ --sample-fps 10</div>
+              <div style="margin-top:4px;"><span style="color:var(--mist);"># Retrain model</span></div>
+              <div>python3 ml/pose_difficulty_model.py</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Joint reference -->
+      <div class="ba-row" style="flex:none;padding:20px 24px;flex-direction:column;gap:12px;">
+        <div class="ba-title">Joint Reference — 17 Climbing Joints</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;" id="joint-ref-grid"></div>
+      </div>
+
+      <!-- Technique gaps -->
+      <div class="ba-row" style="flex:none;padding:20px 24px;flex-direction:column;gap:12px;">
+        <div class="ba-title">Technique Gaps <span style="font-size:9px;color:var(--mist);font-weight:400;margin-left:6px;">based on your target grade</span></div>
+        <div id="weak-points-content">
+          <div style="font-size:11px;color:var(--mist);">Set your grade in the profile above to see your gaps.</div>
+        </div>
+      </div>
+
+      <!-- Recommended routes -->
+      <div class="ba-row" style="flex:none;padding:20px 24px;flex-direction:column;gap:12px;">
+        <div class="ba-title">Routes to Try <span style="font-size:9px;color:var(--mist);font-weight:400;margin-left:6px;">personalised for your next grade</span></div>
+        <div id="profile-recs-content">
+          <div style="font-size:11px;color:var(--mist);">Set your grade in the profile above to load recommendations.</div>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /profile -->
+
+</div><!-- /app-body -->
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Scripts (order matters — each file uses globals from earlier ones) -->
+<script src="js/config.js"></script>
+<script src="js/stick-figure.js"></script>
+<script src="js/pose-animator.js"></script>
+<script src="js/board.js"></script>
+<script src="js/explore.js"></script>
+<script src="js/pose-player.js"></script>
+<script src="js/creator.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
