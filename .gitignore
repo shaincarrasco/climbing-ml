@@ -222,3 +222,9 @@ ml/*.pkl
 ml/evaluation.json
 ml/feature_importance.csv
 ml/pose_model_eval.json
+ml/pose_imputer/*.ubj
+ml/pose_imputer/meta.json
+
+# Scraping progress checkpoints (machine-local state)
+data/beta_scrape_progress.json
+data/climb_scan_progress.json

@@ -40,8 +40,11 @@ import xgboost as xgb
 
 _BASE_DIR            = Path(__file__).resolve().parent.parent
 POSE_FEATURES        = _BASE_DIR / "data" / "pose_features.csv"
+POSE_IMPUTED         = _BASE_DIR / "data" / "pose_imputed.csv"   # full-coverage after imputation
 POSE_CORRELATIONS    = _BASE_DIR / "data" / "pose_correlations.json"
 CORR_MIN_SIGNAL      = 0.05   # drop pose features with |r| below this — pure noise
+IMPUTER_EVAL         = _BASE_DIR / "ml" / "pose_imputer_eval.json"
+IMPUTER_MAE_MAX      = 0.5    # drop imputed features with CV MAE above this threshold
 
 # ── Column definitions ────────────────────────────────────────────────────────
 
@@ -131,6 +134,22 @@ def load_pose_correlations() -> dict:
     return raw
 
 
+def load_reliable_imputed_cols() -> set:
+    """
+    Return the set of pose column names where the imputer CV MAE < IMPUTER_MAE_MAX.
+    These are the only imputed features worth trusting.
+    Returns empty set if eval file missing (fall back to correlation filter only).
+    """
+    if not IMPUTER_EVAL.exists():
+        return set()
+    with open(IMPUTER_EVAL) as f:
+        data = json.load(f)
+    return {
+        e["metric"] for e in data.get("cv_results", [])
+        if e.get("cv_mae", 999) < IMPUTER_MAE_MAX
+    }
+
+
 def _corr_for_pose_col(col: str, raw_corr: dict) -> float:
     """
     Map a pose_features.csv column name (e.g. 'pose_avg_hip_angle') to
@@ -156,42 +175,81 @@ POSE_EXCLUDE = {"climb_uuid", "video_count", "frame_count",
 
 def fuse_pose_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Left-join pose_features.csv into the main routes dataframe.
-    pose_features uses Kilter external_id (climb_uuid); routes uses PostgreSQL UUID (route_id).
-    The mapping goes: pose climb_uuid → board_routes.external_id → board_routes.id = route_id.
-    Routes without pose data get NaN — XGBoost handles these natively.
+    Fuse pose features into the main routes dataframe.
+
+    Priority:
+      1. pose_imputed.csv  — full coverage (real data + model predictions for all 57K routes)
+         Use this when available: every route has a pose profile, no NaN sparsity problem.
+      2. pose_features.csv — real data only (~932 routes, 1.6% coverage)
+         Fallback when imputer hasn't been run yet. XGBoost handles NaN natively.
+
+    Run `python3 ml/pose_imputer.py` to generate pose_imputed.csv.
     """
+    # ── Path 1: imputed CSV (full coverage) ───────────────────────────────────
+    if POSE_IMPUTED.exists():
+        imputed = pd.read_csv(POSE_IMPUTED)
+        pose_cols = [c for c in imputed.columns
+                     if c.startswith("pose_") and c not in POSE_EXCLUDE]
+        if not pose_cols:
+            print("  [pose fusion] pose_imputed.csv has no pose_ columns — falling back")
+        else:
+            reliable = load_reliable_imputed_cols()
+            if reliable:
+                before_r = len(pose_cols)
+                pose_cols = [c for c in pose_cols if c in reliable]
+                print(f"  [pose fusion] imputer quality filter: {len(pose_cols)}/{before_r} pose features "
+                      f"(MAE<{IMPUTER_MAE_MAX}) — dropped noisy angle predictors")
+
+            raw_corr = load_pose_correlations()
+            if raw_corr:
+                before_n  = len(pose_cols)
+                pose_cols = [c for c in pose_cols
+                             if _corr_for_pose_col(c, raw_corr) >= CORR_MIN_SIGNAL]
+                print(f"  [pose fusion] imputed: kept {len(pose_cols)}/{before_n} pose features "
+                      f"(corr filter |r|>={CORR_MIN_SIGNAL})")
+
+            # Drop pose columns already in df (avoid duplicate merge)
+            new_pose = [c for c in pose_cols if c not in df.columns]
+            merge_cols = ["route_id"] + new_pose
+            available  = [c for c in merge_cols if c in imputed.columns]
+            sub = imputed[available].drop_duplicates("route_id")
+
+            before = len(df)
+            df = df.merge(sub, on="route_id", how="left")
+            n_real    = df[new_pose[0]].notna().sum() if new_pose else 0
+            print(f"  [pose fusion] imputed coverage: {n_real:,}/{before:,} routes "
+                  f"({n_real/before*100:.1f}%)  |  +{len(new_pose)} pose features")
+
+            if raw_corr:
+                scored = sorted(
+                    [(c, _corr_for_pose_col(c, raw_corr)) for c in new_pose],
+                    key=lambda x: x[1], reverse=True
+                )
+                print("  [pose fusion] top pose signals:")
+                for col, r in scored[:5]:
+                    print(f"    {col:<40}  |r|={r:.4f}")
+            return df
+
+    # ── Path 2: raw pose_features.csv (sparse fallback) ──────────────────────
     if not POSE_FEATURES.exists():
-        print("  [pose fusion] pose_features.csv not found — skipping")
+        print("  [pose fusion] no pose data found — run pose_imputer.py or pose_feature_extraction.py")
         return df
+
+    print("  [pose fusion] WARNING: using raw pose_features.csv (~1.6% coverage).")
+    print("                Run `python3 ml/pose_imputer.py` to enable full-coverage imputation.")
 
     pf = pd.read_csv(POSE_FEATURES)
     pose_cols = [c for c in pf.columns if c not in POSE_EXCLUDE]
     if not pose_cols:
         return df
 
-    # ── Correlation-guided filtering ──────────────────────────────────────────
     raw_corr = load_pose_correlations()
     if raw_corr:
-        before_n = len(pose_cols)
+        before_n  = len(pose_cols)
         pose_cols = [c for c in pose_cols
                      if _corr_for_pose_col(c, raw_corr) >= CORR_MIN_SIGNAL]
-        dropped = before_n - len(pose_cols)
-        print(f"  [pose fusion] correlation filter: kept {len(pose_cols)}/{before_n} pose features "
-              f"(dropped {dropped} with |r|<{CORR_MIN_SIGNAL})")
+        print(f"  [pose fusion] correlation filter: kept {len(pose_cols)}/{before_n} pose features")
 
-        # Print top signals for visibility
-        scored = sorted(
-            [(c, _corr_for_pose_col(c, raw_corr)) for c in pose_cols],
-            key=lambda x: x[1], reverse=True
-        )
-        print("  [pose fusion] top pose signals:")
-        for col, r in scored[:5]:
-            print(f"    {col:<40}  |r|={r:.4f}")
-    else:
-        print("  [pose fusion] no pose_correlations.json yet — using all pose features")
-
-    # Load the external_id → route_id mapping from PostgreSQL
     try:
         import psycopg2
         from dotenv import load_dotenv
@@ -209,8 +267,6 @@ def fuse_pose_features(df: pd.DataFrame) -> pd.DataFrame:
 
     mapping["ext_upper"] = mapping["external_id"].str.upper()
     pf["ext_upper"]       = pf["climb_uuid"].str.upper()
-
-    # pose_features → route_id
     pf_mapped = pf.merge(mapping[["route_id", "ext_upper"]], on="ext_upper", how="inner")
     pf_mapped = pf_mapped[["route_id"] + pose_cols].drop_duplicates("route_id")
 
@@ -218,7 +274,7 @@ def fuse_pose_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.merge(pf_mapped, on="route_id", how="left")
     n_matched = df[pose_cols[0]].notna().sum()
     print(f"  [pose fusion] {n_matched:,} / {before:,} routes have pose data "
-          f"({n_matched/before*100:.1f}%)  |  +{len(pose_cols)} pose features")
+          f"({n_matched/before*100:.1f}%)")
     return df
 
 
@@ -317,6 +373,19 @@ def train(input_path: str = "data/routes_features.csv",
     print(f"\nSplit: train={len(X_train):,}  val={len(X_val):,}  test={len(X_test):,}")
     print(f"Features: {len(feature_cols)}")
 
+    # Grade-balanced sample weights: inverse frequency so rare grades (V0, V12+)
+    # are not drowned out by the dense V3-V6 middle. Smoothed to avoid extreme weights.
+    from collections import Counter
+    grade_counts  = Counter(g_train)
+    total_train   = len(g_train)
+    n_grades      = len(grade_counts)
+    grade_weight  = {
+        g: (total_train / (n_grades * max(cnt, 1))) ** 0.6   # 0.6 power = soft rebalance
+        for g, cnt in grade_counts.items()
+    }
+    sample_weights_train = np.array([grade_weight[g] for g in g_train])
+    print(f"Sample weight range: {sample_weights_train.min():.2f}x – {sample_weights_train.max():.2f}x")
+
     # ── Train XGBoost ─────────────────────────────────────────────────────────
     model = xgb.XGBRegressor(**XGB_PARAMS, early_stopping_rounds=50, verbosity=1)
 
@@ -324,6 +393,7 @@ def train(input_path: str = "data/routes_features.csv",
     model.fit(
         X_train, y_train,
         eval_set=[(X_val, y_val)],
+        sample_weight=sample_weights_train,
         verbose=100,
     )
 
@@ -373,6 +443,18 @@ def train(input_path: str = "data/routes_features.csv",
     model.save_model(model_path)
     print(f"\nModel → {model_path}")
 
+    # ── Quantile regressors for uncertainty bounds ────────────────────────────
+    print("\nTraining uncertainty bounds (q10 / q90 quantile regressors)…")
+    q_params = {k: v for k, v in XGB_PARAMS.items()
+                if k not in ("objective", "eval_metric")}
+    q_params.update({"objective": "reg:quantileerror", "n_estimators": 400})
+
+    for alpha, label in [(0.10, "q10"), (0.90, "q90")]:
+        qm = xgb.XGBRegressor(**q_params, quantile_alpha=alpha, verbosity=0)
+        qm.fit(X_train, y_train, sample_weight=sample_weights_train)
+        qm.save_model(os.path.join(model_dir, f"difficulty_model_{label}.xgb"))
+    print("  Quantile models → ml/difficulty_model_q10.xgb, ml/difficulty_model_q90.xgb")
+
     # Feature importances
     importances = pd.DataFrame({
         "feature":    feature_cols,
@@ -407,6 +489,7 @@ def train(input_path: str = "data/routes_features.csv",
         "grade_within1_acc":   round(grade_off1, 4),
         "xgb_params":          XGB_PARAMS,
         "top_pose_signals":    top_pose_signals,
+        "quantile_models":     ["difficulty_model_q10.xgb", "difficulty_model_q90.xgb"],
     }
     eval_path = os.path.join(model_dir, "evaluation.json")
     with open(eval_path, "w") as f:

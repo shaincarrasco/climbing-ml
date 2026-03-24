@@ -1,0 +1,203 @@
+{
+  "cv_results": [
+    {
+      "metric": "pose_avg_com_vel",
+      "cv_mae": 0.0058,
+      "cv_mae_std": 0.0005
+    },
+    {
+      "metric": "pose_pct_high_feet",
+      "cv_mae": 0.0099,
+      "cv_mae_std": 0.0019
+    },
+    {
+      "metric": "pose_avg_foot_hand_diff",
+      "cv_mae": 0.0112,
+      "cv_mae_std": 0.0011
+    },
+    {
+      "metric": "pose_p90_tension",
+      "cv_mae": 0.0129,
+      "cv_mae_std": 0.0022
+    },
+    {
+      "metric": "pose_avg_hand_vel",
+      "cv_mae": 0.0134,
+      "cv_mae_std": 0.0006
+    },
+    {
+      "metric": "pose_avg_tension",
+      "cv_mae": 0.0135,
+      "cv_mae_std": 0.0013
+    },
+    {
+      "metric": "pose_reach_asymmetry",
+      "cv_mae": 0.0136,
+      "cv_mae_std": 0.0012
+    },
+    {
+      "metric": "pose_pct_straight_r",
+      "cv_mae": 0.0204,
+      "cv_mae_std": 0.0012
+    },
+    {
+      "metric": "pose_pct_straight_l",
+      "cv_mae": 0.0235,
+      "cv_mae_std": 0.0022
+    },
+    {
+      "metric": "pose_com_travel",
+      "cv_mae": 0.0268,
+      "cv_mae_std": 0.0012
+    },
+    {
+      "metric": "pose_avg_com_to_hands",
+      "cv_mae": 0.0314,
+      "cv_mae_std": 0.0031
+    },
+    {
+      "metric": "pose_peak_com_vel",
+      "cv_mae": 0.0731,
+      "cv_mae_std": 0.0086
+    },
+    {
+      "metric": "pose_peak_hand_vel",
+      "cv_mae": 0.1444,
+      "cv_mae_std": 0.018
+    },
+    {
+      "metric": "pose_min_knee",
+      "cv_mae": 0.9891,
+      "cv_mae_std": 0.0509
+    },
+    {
+      "metric": "pose_elbow_asymmetry",
+      "cv_mae": 1.7951,
+      "cv_mae_std": 0.2274
+    },
+    {
+      "metric": "pose_min_hip_angle",
+      "cv_mae": 1.8991,
+      "cv_mae_std": 0.0555
+    },
+    {
+      "metric": "pose_max_hip_spread",
+      "cv_mae": 2.0107,
+      "cv_mae_std": 0.1401
+    },
+    {
+      "metric": "pose_hip_angle_range",
+      "cv_mae": 2.2659,
+      "cv_mae_std": 0.2034
+    },
+    {
+      "metric": "pose_avg_elbow_l",
+      "cv_mae": 2.6162,
+      "cv_mae_std": 0.1271
+    },
+    {
+      "metric": "pose_avg_knee_r",
+      "cv_mae": 2.6674,
+      "cv_mae_std": 0.397
+    },
+    {
+      "metric": "pose_avg_elbow_r",
+      "cv_mae": 2.7851,
+      "cv_mae_std": 0.3971
+    },
+    {
+      "metric": "pose_avg_knee_l",
+      "cv_mae": 2.9376,
+      "cv_mae_std": 0.3468
+    },
+    {
+      "metric": "pose_avg_shoulder_r",
+      "cv_mae": 3.0125,
+      "cv_mae_std": 0.19
+    },
+    {
+      "metric": "pose_avg_shoulder_l",
+      "cv_mae": 3.0804,
+      "cv_mae_std": 0.2414
+    },
+    {
+      "metric": "pose_min_elbow_r",
+      "cv_mae": 3.3772,
+      "cv_mae_std": 0.581
+    },
+    {
+      "metric": "pose_min_elbow_l",
+      "cv_mae": 3.4284,
+      "cv_mae_std": 0.3702
+    },
+    {
+      "metric": "pose_avg_hip_angle",
+      "cv_mae": 3.5491,
+      "cv_mae_std": 0.4368
+    },
+    {
+      "metric": "pose_avg_hip_spread",
+      "cv_mae": 3.7764,
+      "cv_mae_std": 0.2365
+    },
+    {
+      "metric": "pose_avg_hip_ang_vel",
+      "cv_mae": 4.1791,
+      "cv_mae_std": 0.2068
+    },
+    {
+      "metric": "pose_p10_hip_angle",
+      "cv_mae": 4.8914,
+      "cv_mae_std": 0.3042
+    },
+    {
+      "metric": "pose_peak_elbow_ang_vel",
+      "cv_mae": 19.3161,
+      "cv_mae_std": 1.8008
+    }
+  ],
+  "n_train": 1408,
+  "n_pose_cols": 31,
+  "geo_cols": [
+    "board_angle_deg",
+    "hand_hold_count",
+    "foot_hold_count",
+    "total_hold_count",
+    "foot_ratio",
+    "hand_foot_ratio",
+    "avg_reach_cm",
+    "max_reach_cm",
+    "min_reach_cm",
+    "reach_std_cm",
+    "reach_range_cm",
+    "reach_cv",
+    "avg_lateral_cm",
+    "avg_vertical_cm",
+    "max_lateral_cm",
+    "max_vertical_cm",
+    "vertical_ratio",
+    "lateral_ratio",
+    "avg_foot_spread_cm",
+    "avg_hand_to_foot_cm",
+    "avg_foot_hand_x_offset_cm",
+    "max_foot_hand_x_offset_cm",
+    "height_span_cm",
+    "lateral_span_cm",
+    "width_height_ratio",
+    "hold_density",
+    "direction_changes",
+    "zigzag_ratio",
+    "dyno_score",
+    "dyno_flag",
+    "max_reach_z",
+    "start_height_pct",
+    "finish_height_pct",
+    "hold_spread_x",
+    "hold_spread_y",
+    "crimp_ratio",
+    "sloper_ratio",
+    "jug_ratio",
+    "pinch_ratio",
+    "difficulty_score"
+  ]
+}

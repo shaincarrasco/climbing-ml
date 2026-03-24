@@ -25,7 +25,7 @@ Run:
   python3 api/app.py --port 5001
 """
 
-import os, sys, json, math, sqlite3, random
+import os, sys, json, math, sqlite3, random, hashlib
 import numpy as np
 import pandas as pd
 import psycopg2, psycopg2.extras
@@ -112,6 +112,12 @@ BOARD_CONFIGS = {
         "default_set": "mainline",
     },
 }
+
+# ── Prediction cache (route_id → prediction result) ──────────────────────────
+# Predictions are deterministic per route — cache avoids recomputing features.
+# Cache is cleared on API restart (intentional: models may be updated).
+_prediction_cache = {}
+_CACHE_MAX = 20_000   # evict oldest when full
 
 # ── Load board holds once per layout ───────────────────────────────────────────
 _board_cache = {}
@@ -583,6 +589,15 @@ def predict():
         if h.get("role") not in valid_roles:
             h["role"] = "hand"
 
+    # Cache check: predictions are deterministic — skip recomputing features for identical routes
+    hold_key = hashlib.md5(
+        json.dumps(sorted([(h.get("x_cm", 0), h.get("y_cm", 0), h.get("role", ""))
+                           for h in holds], key=str) + [angle],
+                   sort_keys=True).encode()
+    ).hexdigest()
+    if hold_key in _prediction_cache:
+        return jsonify(_prediction_cache[hold_key])
+
     features = compute_features_from_holds(holds, angle)
     if features is None:
         return jsonify({"error": "Need at least 2 hand holds (start/hand/finish)"}), 400
@@ -621,13 +636,21 @@ def predict():
         "power":      min(100, round((features["sloper_ratio"] * 60 + features["pinch_ratio"] * 40 + features["crimp_ratio"] * 30))),
     }
 
-    return jsonify({
+    result = {
         "grade":      grade,
         "score":      round(score, 4),
         "confidence": confidence,
         "dna":        dna,
         "features":   {k: round(v, 3) if isinstance(v, float) else v for k, v in features.items()},
-    })
+    }
+
+    # Store in prediction cache; evict oldest entry if over limit
+    if len(_prediction_cache) >= _CACHE_MAX:
+        oldest_key = next(iter(_prediction_cache))
+        del _prediction_cache[oldest_key]
+    _prediction_cache[hold_key] = result
+
+    return jsonify(result)
 
 
 @app.route("/api/suggest", methods=["POST"])

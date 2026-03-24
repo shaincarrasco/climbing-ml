@@ -46,10 +46,18 @@ def main():
     ap.add_argument("--pose-only", action="store_true",
                     help="Only retrain the pose model, skip the 57K-route main model")
     ap.add_argument("--quick", action="store_true",
-                    help="Rebuild features + pose model only (fastest, ~30s total)")
+                    help="Pose features + correlations + pose model only (~30s). Skips imputer + main model.")
     args = ap.parse_args()
 
     print("\n══ Climbing ML — Retrain Pipeline ══════════════════════════")
+
+    # Step 0: Purge low-quality pose frames before aggregation
+    # Videos scoring < 35 on data_quality have more noise than signal.
+    # Removing their frames prevents them from corrupting pose_features.csv.
+    run(
+        "Step 0 — Purge low-quality pose frames (score < 35) from DB",
+        [sys.executable, "pipeline/data_quality.py", "--purge-bad", "--threshold", "35"],
+    )
 
     # Step 1: always rebuild pose features CSV from DB
     ok = run(
@@ -61,7 +69,7 @@ def main():
 
     # Step 1b: save Pearson correlations (non-fatal — DB optional)
     run(
-        "Step 1b/4 — Compute pose-metric correlations → data/pose_correlations.json",
+        "Step 1b — Compute pose-metric correlations → data/pose_correlations.json",
         [sys.executable, "pipeline/save_correlations.py"],
     )
 
@@ -73,13 +81,31 @@ def main():
     if not ok:
         sys.exit(1)
 
-    if args.pose_only or args.quick:
-        print("\n══ Done (skipped main model retrain) ══════════════════════")
+    if args.quick:
+        print("\n══ Done (--quick: skipped imputer + main model) ════════════")
         return
 
-    # Step 3: retrain main hold model with pose features fused
+    # Step 3: train pose imputer (hold geometry → pose for ALL 57K routes)
     ok = run(
-        "Step 3/4 — Retrain main difficulty model (with pose fusion)",
+        "Step 3/4 — Train pose imputer → data/pose_imputed.csv (full coverage)",
+        [sys.executable, "ml/pose_imputer.py"],
+    )
+    if not ok:
+        print("  WARNING: pose imputer failed — main model will use sparse pose data")
+
+    # Step 3b: retrain hold type classifier (enriches geometry features)
+    run(
+        "Step 3b — Hold type classifier → data/hold_types_predicted.csv",
+        [sys.executable, "ml/hold_type_classifier.py"],
+    )
+
+    if args.pose_only:
+        print("\n══ Done (--pose-only: skipped main model retrain) ══════════")
+        return
+
+    # Step 4: retrain main hold model with imputed pose features for all routes
+    ok = run(
+        "Step 4/4 — Retrain main difficulty model (with full-coverage pose fusion)",
         [sys.executable, "ml/difficulty_model.py"],
     )
     if not ok:

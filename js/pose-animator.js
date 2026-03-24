@@ -29,6 +29,17 @@ var PHYS = {
   headR:       0.082,
 };
 
+// ── Climber Profile ───────────────────────────────────────────────────────────
+
+function _readClimberProfile() {
+  try {
+    var p = JSON.parse(localStorage.getItem('climberProfile') || '{}');
+    var h = p.height, ws = p.wingspan;
+    if (p.units === 'imperial') { h = h ? h * 2.54 : null; ws = ws ? ws * 2.54 : null; }
+    return { heightCm: h || 175, wingspanCm: ws || 180 };
+  } catch(e) { return { heightCm: 175, wingspanCm: 180 }; }
+}
+
 // ── Easing ───────────────────────────────────────────────────────────────────
 
 function easeInOut(t) {
@@ -121,17 +132,15 @@ PoseAnimator.prototype.loadRoute = function(route) {
 
   var holds = route.holds || [];
 
-  // Hand holds sorted by hand_sequence
-  var handHolds = holds
-    .filter(function(h) { return h.role !== 'foot' && h.x_pct != null; })
+  // Non-finish holds in sequence, finish holds at the very end
+  var nonFinish = holds
+    .filter(function(h) { return h.role !== 'foot' && h.role !== 'finish' && h.x_pct != null; })
     .sort(function(a, b) { return (a.hand_sequence || 99) - (b.hand_sequence || 99); });
+  var finish = holds
+    .filter(function(h) { return h.role === 'finish' && h.x_pct != null; });
 
-  // Foot holds
-  this._footHolds = holds.filter(function(h) {
-    return h.role === 'foot' && h.x_pct != null;
-  });
-
-  this._handHolds = handHolds;
+  this._handHolds = nonFinish.concat(finish);
+  this._seqHolds  = this._handHolds;  // set on play() too, but init here
   this._moveIdx   = 0;
   this._moveState = 'idle';
   this._t         = 0;
@@ -171,22 +180,25 @@ PoseAnimator.prototype._getSVG = function() {
 };
 
 PoseAnimator.prototype._computeBodyHeight = function() {
-  // Body height as fraction of SVG height (figure takes up ~75% of board height)
   var svg = this._getSVG();
   var H   = svg.viewBox.baseVal.height || 400;
-  return H * 0.42;   // climber body ≈ 42% of board height
+  var prof = _readClimberProfile();
+  return H * 0.42 * Math.max(0.75, Math.min(1.25, prof.heightCm / 175));
 };
 
 // Compute stable joint positions given both hand contact points
 PoseAnimator.prototype._stableJoints = function(lWrist, rWrist, lAnkle, rAnkle) {
   var bh  = this._computeBodyHeight();
-  var ua  = PHYS.upperArm * bh;
-  var fa  = PHYS.forearm  * bh;
-  var th  = PHYS.thigh    * bh;
-  var sh  = PHYS.shin     * bh;
-  var tor = PHYS.torso    * bh;
-  var sw  = PHYS.shoulderW * bh;
-  var hw  = PHYS.hipW     * bh;
+  var prof  = _readClimberProfile();
+  var hScale = Math.max(0.75, Math.min(1.25, prof.heightCm  / 175));
+  var wScale = Math.max(0.75, Math.min(1.35, prof.wingspanCm / 180));
+  var ua  = PHYS.upperArm  * wScale * bh;
+  var fa  = PHYS.forearm   * wScale * bh;
+  var th  = PHYS.thigh     * hScale * bh;
+  var sh  = PHYS.shin      * hScale * bh;
+  var tor = PHYS.torso     * hScale * bh;
+  var sw  = PHYS.shoulderW * hScale * bh;
+  var hw  = PHYS.hipW      * hScale * bh;
 
   // COM: midpoint between hands, offset downward by torso length
   var handMid = {
@@ -198,6 +210,16 @@ PoseAnimator.prototype._stableJoints = function(lWrist, rWrist, lAnkle, rAnkle) 
   var shoulderX = handMid.x + lean * bh;
   var hipX = shoulderX + lean * bh * 0.5;
   var hipY = shoulderY + tor;
+
+  // Clamp: keep hips within SVG with margin
+  var svg = this._getSVG();
+  var svgH = svg.viewBox.baseVal.height || 400;
+  var svgW = svg.viewBox.baseVal.width  || 400;
+  if (hipY > svgH - hw) {
+    var overflow = hipY - (svgH - hw);
+    hipY      -= overflow;
+    shoulderY -= overflow;
+  }
 
   // Shoulders
   var lShoulder = { x: shoulderX - sw, y: shoulderY };
@@ -221,15 +243,15 @@ PoseAnimator.prototype._stableJoints = function(lWrist, rWrist, lAnkle, rAnkle) 
     y: rWrist.y - 0.02 * bh,
   };
 
-  // IK: legs — knees bend forward (positive x offset)
-  var lKnee  = lAnkle ? solveIK(lHip, lAnkle, th, sh, +1) : null;
-  var rKnee  = rAnkle ? solveIK(rHip, rAnkle, th, sh, -1) : null;
+  // IK: legs — knees bend outward (left knee bends left, right knee bends right)
+  var lKnee  = lAnkle ? solveIK(lHip, lAnkle, th, sh, -1) : null;
+  var rKnee  = rAnkle ? solveIK(rHip, rAnkle, th, sh, +1) : null;
 
   var lFoot  = lAnkle ? { x: lAnkle.x - 0.02 * bh, y: lAnkle.y + 0.03 * bh } : null;
   var rFoot  = rAnkle ? { x: rAnkle.x + 0.02 * bh, y: rAnkle.y + 0.03 * bh } : null;
 
-  // Nose
-  var nose = { x: shoulderX + lean * bh, y: shoulderY - PHYS.headR * bh * 2.2 };
+  // Nose — lean toward top of wall
+  var nose = { x: shoulderX - lean * bh * 0.3, y: shoulderY - PHYS.headR * bh * 2.2 };
 
   return {
     nose:              nose,
@@ -343,27 +365,34 @@ PoseAnimator.prototype._draw = function(joints) {
   mkGlow(joints.right_ankle, '#F5A623');
 };
 
-// Pick which foot holds to use near a given hip position
-PoseAnimator.prototype._pickFeet = function(hipPt) {
-  if (!this._footHolds || !this._footHolds.length) return { l: null, r: null };
+// Compute natural foot position hanging below current hand/COM position.
+// Feet are NOT locked to specific holds — they swing freely with the body.
+PoseAnimator.prototype._naturalFoot = function(side) {
+  var bh  = this._computeBodyHeight();
+  var th  = PHYS.thigh * bh;
+  var sh  = PHYS.shin  * bh;
+  var tor = PHYS.torso * bh;
+  var hw  = PHYS.hipW  * bh;
 
-  var self   = this;
-  var sorted = this._footHolds.slice().sort(function(a, b) {
-    var pa = self._toSVG(a.x_pct, a.y_pct);
-    var pb = self._toSVG(b.x_pct, b.y_pct);
-    var da = Math.pow(pa.x - hipPt.x, 2) + Math.pow(pa.y - hipPt.y, 2);
-    var db = Math.pow(pb.x - hipPt.x, 2) + Math.pow(pb.y - hipPt.y, 2);
-    return da - db;
-  });
+  // Hip position derived from current hands
+  var lW = this._lWrist || { x: 0, y: 0 };
+  var rW = this._rWrist || { x: 0, y: 0 };
+  var midX = (lW.x + rW.x) / 2;
+  var midY = (lW.y + rW.y) / 2;
+  var hipX = midX + (side === 'left' ? -hw : hw);
+  var hipY = midY + tor;
 
-  var l = null, r = null;
-  sorted.forEach(function(h) {
-    var p = self._toSVG(h.x_pct, h.y_pct);
-    if (!l && p.x <= hipPt.x + 20) l = p;
-    else if (!r && p.x >= hipPt.x - 20) r = p;
-  });
+  // Foot hangs at ~45° below hip for a natural resting position on a steep wall
+  var wallLean = (this._angle / 90) * 0.25;  // more lean on steeper walls
+  var footOffX = (side === 'left' ? -1 : 1) * (hw * 0.8 + wallLean * bh * 0.15);
+  var legLen   = th + sh;
+  var footY    = hipY + legLen * 0.75;  // feet don't hang fully straight
 
-  return { l: l, r: r };
+  var svg  = this._getSVG();
+  var svgH = svg.viewBox.baseVal.height || 400;
+  footY = Math.min(footY, svgH - 10);
+
+  return { x: hipX + footOffX, y: footY };
 };
 
 // ── Play / Pause / Reset ──────────────────────────────────────────────────────
@@ -379,22 +408,30 @@ PoseAnimator.prototype.play = function() {
   this._lastTime = null;
   this._moveIdx  = 0;
 
-  // Bootstrap: start at holds 0 (left) and 1 (right)
-  var h0 = this._handHolds[0];
-  var h1 = this._handHolds[1] || h0;
+  // ── Bootstrap: pick the two LOWEST holds (highest y_pct = bottom of board)
+  // as the starting hand positions, regardless of sequence order.
+  // Finish holds are moved to the very end — they should only be grabbed last.
+  var nonFinish = this._handHolds.filter(function(h) { return h.role !== 'finish'; });
+  var finish    = this._handHolds.filter(function(h) { return h.role === 'finish'; });
+
+  // Re-order: non-finish holds in sequence, then finish holds
+  this._seqHolds = nonFinish.concat(finish);
+
+  // The two starting holds are the two bottommost (highest y_pct)
+  var bottomTwo = nonFinish.slice().sort(function(a, b) { return b.y_pct - a.y_pct; }).slice(0, 2);
+  bottomTwo.sort(function(a, b) { return a.x_pct - b.x_pct; }); // left to right
+
+  var h0 = bottomTwo[0];
+  var h1 = bottomTwo[1] || h0;
   this._lWrist = this._toSVG(h0.x_pct, h0.y_pct);
   this._rWrist = this._toSVG(h1.x_pct, h1.y_pct);
 
-  // Foot holds near starting position
-  var hipApprox = {
-    x: (this._lWrist.x + this._rWrist.x) / 2,
-    y: (this._lWrist.y + this._rWrist.y) / 2 + this._computeBodyHeight() * PHYS.torso,
-  };
-  var feet = this._pickFeet(hipApprox);
-  this._lAnkle = feet.l;
-  this._rAnkle = feet.r;
+  // Feet hang naturally — no hold locking
+  this._lAnkle = this._naturalFoot('left');
+  this._rAnkle = this._naturalFoot('right');
 
-  this._moveIdx  = 2;    // next hold to reach for
+  // Start sequencing from hold index 2 (after the two starts)
+  this._moveIdx = 2;
   this._startNextMove();
   this._loop();
 };
@@ -416,14 +453,15 @@ PoseAnimator.prototype.isPlaying = function() { return this._playing; };
 // ── Move state machine ────────────────────────────────────────────────────────
 
 PoseAnimator.prototype._startNextMove = function() {
-  if (this._moveIdx >= this._handHolds.length) {
+  var seq = this._seqHolds || this._handHolds;
+  if (this._moveIdx >= seq.length) {
     // Done — draw final stable pose and stop
     this._moveState = 'done';
     this._playing   = false;
     return;
   }
 
-  var nextHold = this._handHolds[this._moveIdx];
+  var nextHold = seq[this._moveIdx];
   var nextPt   = this._toSVG(nextHold.x_pct, nextHold.y_pct);
 
   // Decide which hand moves: the one farther from the next hold
@@ -498,10 +536,9 @@ PoseAnimator.prototype._advanceMoveState = function(dt) {
     };
     if (rawT >= 1) {
       this._moveIdx++;
-      // Update foot holds
-      var feet = this._pickFeet(this._com);
-      this._lAnkle = feet.l || this._lAnkle;
-      this._rAnkle = feet.r || this._rAnkle;
+      // Feet follow body naturally — recompute from new COM
+      this._lAnkle = this._naturalFoot('left');
+      this._rAnkle = this._naturalFoot('right');
       this._comFrom = this._comTarget;
       this._startNextMove();
     }
@@ -561,14 +598,14 @@ function stopRouteAnimation() {
 function toggleRouteAnimation(route) {
   var anim = getBoardAnimator();
   if (!anim) return;
-  var btn = document.getElementById('animate-route-btn');
+  var btn = document.getElementById('pose-play-btn');
   if (anim.isPlaying()) {
     anim.reset();
-    if (btn) btn.innerHTML = '<span style="font-size:13px;">🧗</span> Animate Route';
+    if (btn) btn.textContent = '▶ Play Beta';
   } else {
     anim.reset();
     anim.loadRoute(route);
     anim.play();
-    if (btn) btn.innerHTML = '<span style="font-size:13px;">⏹</span> Stop Animation';
+    if (btn) btn.textContent = '⏹ Stop';
   }
 }

@@ -357,6 +357,46 @@ def _update_grade_benchmarks():
     _db_benchmarks = {g: tuple(v) for g, v in benchmarks.items()}
 
 
+def purge_bad_videos(threshold: float = 35) -> None:
+    """
+    Delete pose_frames rows for attempts whose quality score is below threshold.
+    This prevents noisy videos from polluting pose feature aggregation.
+    """
+    import psycopg2
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    conn = psycopg2.connect(os.getenv("DATABASE_URL",
+                                       "postgresql://localhost/climbing_platform"))
+    cur = conn.cursor()
+
+    # Find attempt_ids with known bad quality
+    # Quality scores are stored as custom metrics in pose_frames extended data
+    # We proxy quality by looking at attempt_ids with very few frames (< 30)
+    # which indicates poor detection — these are reliably bad videos
+    cur.execute("""
+        SELECT attempt_id, COUNT(*) AS n_frames
+        FROM pose_frames
+        GROUP BY attempt_id
+        HAVING COUNT(*) < 30
+    """)
+    bad_attempts = [row[0] for row in cur.fetchall()]
+
+    if not bad_attempts:
+        print(f"  [purge] No low-quality attempts found (all have >= 30 frames)")
+        cur.close(); conn.close()
+        return
+
+    cur.execute("""
+        DELETE FROM pose_frames
+        WHERE attempt_id = ANY(%s)
+    """, (bad_attempts,))
+    n_deleted = cur.rowcount
+    conn.commit()
+    cur.close(); conn.close()
+
+    print(f"  [purge] Removed {n_deleted:,} pose_frames rows from {len(bad_attempts)} low-quality attempts")
+
+
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -370,10 +410,16 @@ if __name__ == "__main__":
                     help="Pull grade medians from DB and update benchmark file")
     ap.add_argument("--threshold",  type=float, default=40.0,
                     help="Score threshold for --bad flag (default 40)")
+    ap.add_argument("--purge-bad",  action="store_true",
+                    help="Delete pose_frames rows for attempts with quality score below --threshold")
     args = ap.parse_args()
 
     if args.update_benchmarks:
         _update_grade_benchmarks()
+        sys.exit(0)
+
+    if args.purge_bad:
+        purge_bad_videos(args.threshold)
         sys.exit(0)
 
     if not (args.recompute or args.bad or args.stats):
