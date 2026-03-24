@@ -4,6 +4,7 @@ var creatorHolds = [];
 var activeRole   = 'start';
 var suggestMode  = false;
 var predictTimer = null;
+var _creatorAnimator = null;
 
 // ── Role Selector ─────────────────────────────────────────────────────────────
 
@@ -206,6 +207,45 @@ function _updateCreatorFigure() {
   _drawHoldMarkers(svg, joints, lHold, rHold, lFoot, rFoot, W, H);
 }
 
+function playCreatorBeta() {
+  if (!_creatorAnimator) {
+    var board = document.getElementById('creator-board');
+    _creatorAnimator = new PoseAnimator(board, 'creator-board-figure-overlay');
+  }
+  var handHolds = creatorHolds
+    .filter(function(h) { return h.role !== 'foot' && h.x_cm != null; })
+    .map(function(h) {
+      // Convert cm to pct (board is 140cm wide/tall)
+      return Object.assign({}, h, {
+        x_pct: (h.x_cm / 140) * 100,
+        y_pct: 100 - (h.y_cm / 140) * 100,  // kilter y_cm=0 is bottom, y_pct=0 is top
+      });
+    });
+  var footHolds = creatorHolds
+    .filter(function(h) { return h.role === 'foot' && h.x_cm != null; })
+    .map(function(h) {
+      return Object.assign({}, h, {
+        x_pct: (h.x_cm / 140) * 100,
+        y_pct: 100 - (h.y_cm / 140) * 100,
+      });
+    });
+  if (handHolds.length < 2) { showToast('Need at least 2 hand holds to animate', 'warn'); return; }
+  var fakeRoute = {
+    holds: handHolds.concat(footHolds),
+    board_angle_deg: creatorAngle || 40,
+  };
+  var btn = document.getElementById('creator-play-btn');
+  if (_creatorAnimator.isPlaying()) {
+    _creatorAnimator.reset();
+    if (btn) btn.textContent = '▶ Play Beta';
+  } else {
+    _creatorAnimator.reset();
+    _creatorAnimator.loadRoute(fakeRoute);
+    _creatorAnimator.play();
+    if (btn) btn.textContent = '⏹ Stop';
+  }
+}
+
 function updatePathfinderStatus() {
   var status   = document.getElementById('pf-status');
   var starts   = creatorHolds.filter(function(h) { return h.role === 'start'; }).length;
@@ -233,12 +273,8 @@ function showHoldPreview(el, hold, e) {
   var holdXPct = parseFloat(el.style.left);
   var holdYPct = parseFloat(el.style.top);
 
-  var joints = computeHoldReachPose(holdXPct, holdYPct, creatorAngle);
-  var svg = document.getElementById('hover-figure-svg');
-  if (svg) renderStickFigure(svg, joints, 80, 120, 8);
-
   var infoEl = preview.querySelector('.preview-label');
-  if (infoEl) infoEl.textContent = hold.hold_type + '\n' + Math.round(holdXPct) + '%, ' + Math.round(holdYPct) + '%';
+  if (infoEl) infoEl.textContent = hold.hold_type + '  (' + Math.round(hold.x || 0) + ', ' + Math.round(hold.y || 0) + ')';
 
   // Position: relative to creator-board-area
   var areaEl = document.getElementById('creator-board-area');
@@ -439,16 +475,37 @@ function clearCreator() {
   });
 }
 
-function saveDraftRoute() {
+async function saveDraftRoute() {
   var starts   = creatorHolds.filter(function(h) { return h.role === 'start'; }).length;
   var finishes = creatorHolds.filter(function(h) { return h.role === 'finish'; }).length;
   var hands    = creatorHolds.filter(function(h) { return h.role === 'hand'; }).length;
 
-  if (starts < 1)  { showToast('Add at least 1 start hold.', 'warn'); return; }
+  if (starts < 1)   { showToast('Add at least 1 start hold.', 'warn'); return; }
   if (finishes < 1) { showToast('Add a finish hold.', 'warn'); return; }
-  if (hands < 1)   { showToast('Add at least 1 hand hold.', 'warn'); return; }
+  if (hands < 1)    { showToast('Add at least 1 hand hold.', 'warn'); return; }
 
-  var grade = document.getElementById('pred-grade').textContent;
-  showToast('Route saved! ' + creatorHolds.length + ' holds · ' + creatorAngle + '° · ' + (grade || '—'), 'success');
-  // TODO: persist to backend
+  var grade = document.getElementById('pred-grade').textContent.replace('~', '');
+  var conf  = parseFloat((document.getElementById('pred-conf').textContent || '0')) / 100 || 0;
+
+  var name = prompt('Name this route:', 'My Route ' + new Date().toLocaleDateString());
+  if (name === null) return;  // user cancelled
+
+  try {
+    var res = await fetch(API + '/api/routes/saved', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name:             name || 'Untitled Route',
+        angle:            creatorAngle,
+        predicted_grade:  grade,
+        confidence:       conf,
+        holds:            creatorHolds,
+      }),
+    });
+    var data = await res.json();
+    if (data.error) { showToast('Save failed: ' + data.error, 'error'); return; }
+    showToast('Saved "' + name + '" — ' + creatorHolds.length + ' holds · ' + grade, 'success');
+  } catch(e) {
+    showToast('Could not save — is the API running?', 'error');
+  }
 }

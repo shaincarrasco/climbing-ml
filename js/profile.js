@@ -166,6 +166,15 @@ function saveClimberProfile() {
     msg.style.opacity = '1';
     setTimeout(function() { msg.style.opacity = '0'; }, 1800);
   }
+
+  // Refresh body model with new proportions
+  renderDefaultFigure('beta-figure-svg');
+  // Re-render route figure if one is selected
+  if (typeof currentRoute !== 'undefined' && currentRoute) {
+    renderRouteFigure(currentRoute);
+  }
+  // Notify creator figure
+  if (typeof _updateCreatorFigure === 'function') _updateCreatorFigure();
 }
 
 function updateDerived() {

@@ -38,8 +38,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import xgboost as xgb
 
-_BASE_DIR       = Path(__file__).resolve().parent.parent
-POSE_FEATURES   = _BASE_DIR / "data" / "pose_features.csv"
+_BASE_DIR            = Path(__file__).resolve().parent.parent
+POSE_FEATURES        = _BASE_DIR / "data" / "pose_features.csv"
+POSE_CORRELATIONS    = _BASE_DIR / "data" / "pose_correlations.json"
+CORR_MIN_SIGNAL      = 0.05   # drop pose features with |r| below this — pure noise
 
 # ── Column definitions ────────────────────────────────────────────────────────
 
@@ -110,6 +112,42 @@ def scores_to_grades(scores: np.ndarray, boundaries: dict) -> list:
     return [score_to_grade(s, boundaries) for s in scores]
 
 
+# ── Pose correlations ─────────────────────────────────────────────────────────
+
+def load_pose_correlations() -> dict:
+    """
+    Return {metric_name: abs_r} from data/pose_correlations.json.
+    Maps raw DB column names (e.g. hip_angle_deg) to pose_features.csv
+    column names (e.g. pose_avg_hip_angle) via a best-effort substring match.
+    Returns {} if the file doesn't exist yet (first run).
+    """
+    if not POSE_CORRELATIONS.exists():
+        return {}
+    with open(POSE_CORRELATIONS) as f:
+        data = json.load(f)
+    # Build {db_metric: abs_r}
+    raw = {entry["metric"]: entry.get("abs_r", 0.0)
+           for entry in data.get("correlations", [])}
+    return raw
+
+
+def _corr_for_pose_col(col: str, raw_corr: dict) -> float:
+    """
+    Map a pose_features.csv column name (e.g. 'pose_avg_hip_angle') to
+    the closest DB metric (e.g. 'hip_angle_deg') and return abs_r.
+    Falls back to 1.0 (keep all) if no mapping found.
+    """
+    # Strip 'pose_' prefix and common aggregation words for matching
+    stripped = col.replace("pose_", "").replace("avg_", "").replace("min_", "") \
+                  .replace("max_", "").replace("pct_", "").replace("std_", "")
+    # Direct keyword match
+    for metric, abs_r in raw_corr.items():
+        core = metric.replace("_deg", "").replace("_norm", "").replace("_score", "")
+        if core in stripped or stripped in core:
+            return abs_r
+    return 1.0  # unknown — keep by default
+
+
 # ── Pose feature fusion ───────────────────────────────────────────────────────
 
 POSE_EXCLUDE = {"climb_uuid", "video_count", "frame_count",
@@ -131,6 +169,27 @@ def fuse_pose_features(df: pd.DataFrame) -> pd.DataFrame:
     pose_cols = [c for c in pf.columns if c not in POSE_EXCLUDE]
     if not pose_cols:
         return df
+
+    # ── Correlation-guided filtering ──────────────────────────────────────────
+    raw_corr = load_pose_correlations()
+    if raw_corr:
+        before_n = len(pose_cols)
+        pose_cols = [c for c in pose_cols
+                     if _corr_for_pose_col(c, raw_corr) >= CORR_MIN_SIGNAL]
+        dropped = before_n - len(pose_cols)
+        print(f"  [pose fusion] correlation filter: kept {len(pose_cols)}/{before_n} pose features "
+              f"(dropped {dropped} with |r|<{CORR_MIN_SIGNAL})")
+
+        # Print top signals for visibility
+        scored = sorted(
+            [(c, _corr_for_pose_col(c, raw_corr)) for c in pose_cols],
+            key=lambda x: x[1], reverse=True
+        )
+        print("  [pose fusion] top pose signals:")
+        for col, r in scored[:5]:
+            print(f"    {col:<40}  |r|={r:.4f}")
+    else:
+        print("  [pose fusion] no pose_correlations.json yet — using all pose features")
 
     # Load the external_id → route_id mapping from PostgreSQL
     try:
@@ -327,6 +386,13 @@ def train(input_path: str = "data/routes_features.csv",
     print(importances.head(15).to_string(index=False))
 
     # Evaluation JSON
+    raw_corr = load_pose_correlations()
+    top_pose_signals = sorted(
+        [{"feature": c, "abs_r": round(_corr_for_pose_col(c, raw_corr), 4)}
+         for c in feature_cols if c.startswith("pose_")],
+        key=lambda x: x["abs_r"], reverse=True
+    ) if raw_corr else []
+
     eval_data = {
         "n_train":             len(X_train),
         "n_val":               len(X_val),
@@ -340,6 +406,7 @@ def train(input_path: str = "data/routes_features.csv",
         "grade_exact_acc":     round(grade_exact, 4),
         "grade_within1_acc":   round(grade_off1, 4),
         "xgb_params":          XGB_PARAMS,
+        "top_pose_signals":    top_pose_signals,
     }
     eval_path = os.path.join(model_dir, "evaluation.json")
     with open(eval_path, "w") as f:

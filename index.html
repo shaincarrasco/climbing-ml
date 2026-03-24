@@ -16,7 +16,12 @@
     <button class="nav-tab" onclick="switchTab('creator')">Creator</button>
     <button class="nav-tab" onclick="switchTab('profile')">Profile</button>
   </div>
-  <div class="nav-stats" id="nav-stats">Loading…</div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="nav-stats" id="nav-stats">Loading…</div>
+    <button class="nav-profile-btn" id="nav-profile-btn" onclick="switchTab('profile')" title="Your profile">
+      <span id="nav-profile-label">Set up profile</span>
+    </button>
+  </div>
 </nav>
 
 <!-- ── APP BODY ── -->
@@ -231,6 +236,10 @@
         <div class="figure-svg-wrap">
           <svg id="creator-figure-svg" width="120" height="180" viewBox="0 0 120 180"></svg>
         </div>
+      </div>
+
+      <div style="padding:0 0 8px;">
+        <button class="play-btn" id="creator-play-btn" onclick="playCreatorBeta()" style="width:100%;margin-top:6px;">▶ Play Beta</button>
       </div>
     </div>
 
@@ -463,6 +472,40 @@
 
 <!-- Toast -->
 <div id="toast"></div>
+
+<!-- ── Profile Setup Modal ── -->
+<div id="profile-modal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-title">Set Up Your Profile</div>
+    <div class="modal-sub">Personalizes the beta animator to your body</div>
+    <div class="modal-field">
+      <label>Name</label>
+      <input type="text" id="modal-name" placeholder="Your name" autocomplete="name">
+    </div>
+    <div class="modal-field">
+      <label>Height (cm)</label>
+      <input type="number" id="modal-height" placeholder="175" min="140" max="230">
+    </div>
+    <div class="modal-field">
+      <label>Wingspan (cm)</label>
+      <input type="number" id="modal-wingspan" placeholder="180" min="140" max="250">
+    </div>
+    <div class="modal-field">
+      <label>On-sight Grade</label>
+      <select id="modal-onsight">
+        <option value="">Skip for now</option>
+        <option>V0</option><option>V1</option><option>V2</option><option>V3</option>
+        <option>V4</option><option>V5</option><option>V6</option><option>V7</option>
+        <option>V8</option><option>V9</option><option>V10</option><option>V11</option>
+        <option>V12</option><option>V13</option><option>V14</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:18px;">
+      <button class="btn btn-primary" onclick="submitProfileModal()" style="flex:1;">Save Profile</button>
+      <button class="btn btn-ghost"   onclick="dismissProfileModal()" style="flex:0 0 auto;">Skip</button>
+    </div>
+  </div>
+</div>
 
 <!-- Scripts (order matters — each file uses globals from earlier ones) -->
 <script src="js/config.js"></script>

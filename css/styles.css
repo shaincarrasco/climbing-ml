@@ -1065,3 +1065,36 @@ nav {
   outline-offset: 1px;
   transform: scale(1.15);
 }
+
+/* Profile modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; backdrop-filter: blur(4px);
+}
+.modal-box {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 14px; padding: 28px 28px 24px; width: 340px; max-width: 90vw;
+}
+.modal-title { font-size: 16px; font-weight: 700; color: var(--chalk); margin-bottom: 4px; }
+.modal-sub { font-size: 11px; color: var(--mist); margin-bottom: 18px; }
+.modal-field { margin-bottom: 12px; }
+.modal-field label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: var(--mist); margin-bottom: 5px; text-transform: uppercase; }
+.modal-field input, .modal-field select {
+  width: 100%; box-sizing: border-box; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 6px;
+  color: var(--chalk); font-size: 13px; padding: 8px 10px;
+}
+.modal-field input:focus, .modal-field select:focus {
+  outline: none; border-color: var(--teal);
+}
+
+/* Nav profile button */
+.nav-profile-btn {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--mist); font-size: 10px; font-family: 'Space Mono', monospace;
+  padding: 5px 10px; cursor: pointer; white-space: nowrap;
+  transition: border-color 0.2s, color 0.2s;
+}
+.nav-profile-btn:hover { border-color: var(--teal); color: var(--teal); }
+.nav-profile-btn.has-profile { border-color: rgba(0,212,184,0.4); color: var(--teal); }

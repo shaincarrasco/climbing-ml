@@ -8,20 +8,17 @@ var posePlayActive = false;
 // ── Load ──────────────────────────────────────────────────────────────────────
 
 async function loadPoseAnimation(climbUuid) {
-  stopPosePlay();
+  // Fetch real scraped frames in the background — used only for sparkline + phase breakdown.
+  // Does NOT control the Play Beta button (physics animator handles that).
   poseFrames   = [];
   poseFrameIdx = 0;
 
-  var btn  = document.getElementById('pose-play-btn');
-  var ctr  = document.getElementById('pose-frame-counter');
   var sec  = document.getElementById('pose-phases-section');
   var scWr = document.getElementById('scrubber-wrap');
   var scEl = document.getElementById('pose-scrubber');
   var spWr = document.getElementById('sparkline-wrap');
   var kbh  = document.getElementById('kbd-hint');
 
-  if (btn)  { btn.disabled = true; btn.textContent = '▶ Play Beta'; }
-  if (ctr)  ctr.textContent = 'Loading pose data…';
   if (sec)  sec.style.display = 'none';
   if (scWr) scWr.style.display = 'none';
   if (spWr) spWr.style.display = 'none';
@@ -30,47 +27,37 @@ async function loadPoseAnimation(climbUuid) {
 
   try {
     var res = await fetch(API + '/api/pose/frames/' + climbUuid);
-    if (!res.ok) { if (ctr) ctr.textContent = ''; return; }
+    if (!res.ok) return;
     var data = await res.json();
-    if (!data.frames || !data.frames.length) { if (ctr) ctr.textContent = ''; return; }
+    if (!data.frames || !data.frames.length) return;
 
     poseFrames = data.frames;
-    if (btn) btn.disabled = false;
-    if (ctr) ctr.textContent = poseFrames.length + ' frames · ' + data.total_frames + ' total';
+
+    // Enrich frame counter with real data info
+    var ctr = document.getElementById('pose-frame-counter');
+    if (ctr) ctr.textContent = 'real beta · ' + poseFrames.length + ' frames';
+
     if (scEl) { scEl.max = poseFrames.length - 1; scEl.value = 0; scEl.disabled = false; }
     if (scWr) scWr.style.display = 'flex';
     if (kbh)  kbh.style.display = '';
 
     buildSparkline(poseFrames);
     renderPosePhases(poseFrames);
-
-    // Show the first frame immediately so the figure updates
-    _renderPoseFrame(0);
-  } catch(e) {
-    if (ctr) ctr.textContent = '';
-  }
+  } catch(e) {}
 }
 
 // ── Playback ──────────────────────────────────────────────────────────────────
 
 function togglePosePlay() {
-  if (posePlayActive) stopPosePlay();
-  else startPosePlay();
-}
-
-function startPosePlay() {
-  if (!poseFrames.length) return;
-  posePlayActive = true;
-  var btn = document.getElementById('pose-play-btn');
-  if (btn) btn.textContent = '⏸ Pause';
-  stepPoseFrame();
+  // Always use the physics animator on the board as the primary beta.
+  // Real scraped frames (when available) power the sparkline/phase breakdown only.
+  toggleRouteAnimation(currentRoute);
 }
 
 function stopPosePlay() {
+  stopRouteAnimation();
   posePlayActive = false;
   if (poseAnimTimer) { clearTimeout(poseAnimTimer); poseAnimTimer = null; }
-  var btn = document.getElementById('pose-play-btn');
-  if (btn && poseFrames.length) btn.textContent = '▶ Play Beta';
 }
 
 function stepPoseFrame() {

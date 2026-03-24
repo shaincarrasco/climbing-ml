@@ -197,27 +197,19 @@ function renderRouteDetail(route) {
         '<div class="creator-label">Move Breakdown <span style="color:var(--purple);font-size:9px;margin-left:4px;">BETA VIDEO</span></div>' +
         '<div class="pose-phase-grid" id="pose-phase-grid"></div>' +
       '</div>' +
-      '<div style="margin-top:16px;">' +
-        '<button id="animate-route-btn" onclick="toggleRouteAnimation(currentRoute)" ' +
-          'style="width:100%;padding:8px;background:var(--panel);border:1px solid var(--border);' +
-          'border-radius:6px;color:var(--chalk);font-size:11px;cursor:pointer;' +
-          'display:flex;align-items:center;justify-content:center;gap:6px;">' +
-          '<span style="font-size:13px;">🧗</span> Animate Route' +
-        '</button>' +
-      '</div>' +
     '</div>';
 
-  // Stick figure from start hold positions, then try loading pose animation
+  // Physics beta always available — enable Play Beta immediately
   renderRouteFigure(route);
-  if (route.external_id) {
+  var btn = document.getElementById('pose-play-btn');
+  var ctr = document.getElementById('pose-frame-counter');
+  stopRouteAnimation();
+  if (btn) { btn.disabled = false; btn.textContent = '▶ Play Beta'; }
+  if (ctr) ctr.textContent = route.has_pose ? 'real beta available' : 'AI-generated beta';
+
+  // If scraped frames exist, load them in background for sparkline + phase breakdown
+  if (route.external_id && route.has_pose) {
     loadPoseAnimation(route.external_id);
-  } else {
-    stopPosePlay();
-    poseFrames = [];
-    var btn = document.getElementById('pose-play-btn');
-    var ctr = document.getElementById('pose-frame-counter');
-    if (btn) { btn.disabled = true; btn.textContent = '▶ Play Beta'; }
-    if (ctr) ctr.textContent = '';
   }
 
   // Load ML-predicted route DNA

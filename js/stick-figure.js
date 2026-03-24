@@ -45,14 +45,19 @@ function computeClimbingPose(opts) {
   var tension        = (opts && opts.tension)        || 0.55;
   var lateral_spread = (opts && opts.lateral_spread) || 0.45;
 
+  var profHeight = (opts && opts.heightCm)   || 175;
+  var profWing   = (opts && opts.wingspanCm) || 180;
+  var hScale = Math.max(0.8, Math.min(1.2, profHeight / 175));
+  var wScale = Math.max(0.8, Math.min(1.3, profWing   / 180));
+
   var lean    = angle / 70;
   var compact = tension;
   var armExt  = Math.min(avg_arm_reach, 1.2) / 1.2;
   var spread  = Math.max(0.15, Math.min(lateral_spread, 0.65));
 
   // hipY: 0 = top of SVG, 1 = bottom. Clamp so feet never fall below 0.93.
-  var hipY      = Math.min(0.72 - com_height * 0.3, 0.58);
-  var shoulderY = hipY - (0.18 - lean * 0.04);
+  var hipY      = Math.min(0.72 - com_height * 0.3 * hScale, 0.58);
+  var shoulderY = hipY - (0.18 - lean * 0.04) * hScale;
   var midX      = 0.5;
   var hipX_off  = lean * 0.04;
 
@@ -64,13 +69,13 @@ function computeClimbingPose(opts) {
   j.right_shoulder = { x: midX + 0.10,             y: shoulderY };
   j.nose           = { x: midX + lean * 0.03,       y: shoulderY - 0.10 };
 
-  var elbowSpreadX = spread * (0.5 + armExt * 0.3);
+  var elbowSpreadX = spread * (0.5 + armExt * 0.3) * wScale;
   var elbowY       = shoulderY - 0.06 * (1 - compact * 0.4);
   j.left_elbow     = { x: midX - elbowSpreadX * 0.65, y: elbowY };
   j.right_elbow    = { x: midX + elbowSpreadX * 0.65, y: elbowY };
 
-  var wristY    = shoulderY - 0.22 * armExt;
-  var wristSprd = spread * (0.8 + armExt * 0.25);
+  var wristY    = shoulderY - 0.22 * hScale * armExt;
+  var wristSprd = spread * (0.8 + armExt * 0.25) * wScale;
   j.left_wrist  = { x: midX - wristSprd * 0.70, y: wristY };
   j.right_wrist = { x: midX + wristSprd * 0.55, y: wristY + 0.03 };
 
@@ -78,11 +83,11 @@ function computeClimbingPose(opts) {
   j.right_index = { x: j.right_wrist.x + 0.02, y: j.right_wrist.y - 0.03 };
 
   var kneeBend = 0.12 + compact * 0.08 + lean * 0.05;
-  var kneeY    = hipY + 0.18;
+  var kneeY    = hipY + 0.18 * hScale;
   j.left_knee  = { x: midX - 0.09 - lean * 0.02, y: kneeY };
   j.right_knee = { x: midX + 0.09 - lean * 0.02, y: kneeY };
 
-  var ankleY    = kneeY + 0.16;
+  var ankleY    = kneeY + 0.16 * hScale;
   var footSprd  = spread * 0.55;
   j.left_ankle  = { x: midX - footSprd - lean * 0.04,         y: ankleY };
   j.right_ankle = { x: midX + footSprd * 0.8 - lean * 0.04,  y: ankleY - 0.02 };
@@ -175,12 +180,22 @@ function renderStickFigure(svg, joints, W, H, pad, labels) {
   });
 }
 
+function getClimberPhysFromProfile() {
+  try {
+    var p = JSON.parse(localStorage.getItem('climberProfile') || '{}');
+    var h = p.height, ws = p.wingspan;
+    if (p.units === 'imperial') { h = h ? h * 2.54 : null; ws = ws ? ws * 2.54 : null; }
+    return { heightCm: h || 175, wingspanCm: ws || 180 };
+  } catch(e) { return { heightCm: 175, wingspanCm: 180 }; }
+}
+
 function renderDefaultFigure(svgId) {
   var svg = document.getElementById(svgId);
   if (!svg) return;
   var W = +svg.getAttribute('width');
   var H = +svg.getAttribute('height');
-  renderStickFigure(svg, computeClimbingPose(), W, H);
+  var prof = getClimberPhysFromProfile();
+  renderStickFigure(svg, computeClimbingPose(prof), W, H);
 }
 
 // Render static figure from route metadata + start hold positions
@@ -216,10 +231,10 @@ function renderRouteFigure(route) {
     armReach = Math.max(0.70, Math.min(1.10, 1.05 - avgY / 160));
   }
 
-  var joints = computeClimbingPose({
+  var joints = computeClimbingPose(Object.assign({
     angle: angle, avg_arm_reach: armReach,
     com_height: com_height, tension: tension, lateral_spread: lateral_spread,
-  });
+  }, getClimberPhysFromProfile()));
 
   // Pin wrists to actual hold positions.
   // Y: relative to shoulder — y_pct=0 (top of board) = arms fully up above shoulder;

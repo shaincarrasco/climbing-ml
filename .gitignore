@@ -215,3 +215,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ML binary artifacts (large, retrain to regenerate)
+ml/*.xgb
+ml/*.pkl
+ml/evaluation.json
+ml/feature_importance.csv
+ml/pose_model_eval.json

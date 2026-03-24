@@ -52,7 +52,10 @@ def _find_project_root() -> str:
     return candidate  # best guess
 
 _PROJECT_ROOT = _find_project_root()
-SQLITE_PATH   = os.getenv("KILTER_DB_PATH", os.path.join(_PROJECT_ROOT, "kilter.db"))
+_env_db_path  = os.getenv("KILTER_DB_PATH", "")
+SQLITE_PATH   = (os.path.expanduser(_env_db_path)
+                 if _env_db_path and os.path.isfile(os.path.expanduser(_env_db_path))
+                 else os.path.join(_PROJECT_ROOT, "kilter.db"))
 MODEL_DIR   = os.path.join(_PROJECT_ROOT, "ml")
 DATA_DIR    = os.path.join(_PROJECT_ROOT, "data")
 
@@ -472,7 +475,7 @@ def routes():
 
         cur.execute(f"""
             SELECT br.id, br.name, br.setter_name, br.community_grade, br.difficulty_score,
-                   br.board_angle_deg, br.send_count, br.avg_quality_rating,
+                   br.board_angle_deg, br.send_count, br.avg_quality_rating, br.external_id,
                    (EXISTS (
                        SELECT 1 FROM pose_frames pf
                        WHERE UPPER(pf.climb_uuid) = UPPER(br.external_id)
@@ -1442,6 +1445,98 @@ def pose_stats():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/pose/correlations")
+def pose_correlations():
+    """
+    Pearson correlation coefficients between each pose metric and difficulty_score,
+    plus per-grade median benchmarks. Used to track which body mechanics most
+    strongly predict grade — feeds back into model feature weighting.
+
+    Serves cached data/pose_correlations.json (written by retrain.py) when available —
+    instant response. Falls back to live DB queries if the file is missing.
+    """
+    corr_cache = os.path.join(DATA_DIR, "pose_correlations.json")
+    if os.path.exists(corr_cache):
+        try:
+            with open(corr_cache) as f:
+                payload = json.load(f)
+            payload["source"] = "cached"
+            return jsonify(payload)
+        except Exception:
+            pass  # fall through to live query
+
+    try:
+        pg  = get_pg()
+        cur = pg.cursor()
+
+        # Per-grade medians for the benchmark table
+        cur.execute("""
+            SELECT
+                br.community_grade,
+                MIN(br.difficulty_score)                                               AS diff_score,
+                ROUND(AVG(pf.hip_angle_deg)::numeric, 1)                              AS avg_hip_angle,
+                ROUND(AVG(pf.tension_score)::numeric, 3)                              AS avg_tension,
+                ROUND(AVG(pf.com_height_norm)::numeric, 3)                            AS avg_com_height,
+                ROUND(AVG((pf.left_arm_reach_norm+pf.right_arm_reach_norm)/2)::numeric,3) AS avg_reach,
+                ROUND(AVG(pf.hip_spread_deg)::numeric, 1)                             AS avg_hip_spread,
+                ROUND(AVG(pf.elbow_l_deg)::numeric, 1)                                AS avg_elbow_l,
+                ROUND(AVG(pf.elbow_r_deg)::numeric, 1)                                AS avg_elbow_r,
+                ROUND(AVG(pf.knee_l_deg)::numeric, 1)                                 AS avg_knee,
+                ROUND(AVG(pf.com_velocity)::numeric, 4)                               AS avg_com_vel,
+                COUNT(DISTINCT pf.attempt_id)                                          AS videos,
+                COUNT(*)                                                               AS frames
+            FROM pose_frames pf
+            JOIN board_routes br ON UPPER(br.external_id) = UPPER(pf.climb_uuid)
+            WHERE br.community_grade IS NOT NULL
+              AND br.difficulty_score IS NOT NULL
+            GROUP BY br.community_grade
+            HAVING COUNT(*) >= 20
+            ORDER BY MIN(br.difficulty_score)
+        """)
+        grade_rows = cur.fetchall()
+        cols = [d[0] for d in cur.description]
+        grade_benchmarks = [dict(zip(cols, row)) for row in grade_rows]
+        for row in grade_benchmarks:
+            for k, v in row.items():
+                if hasattr(v, '__float__'):
+                    row[k] = float(v)
+
+        # Pearson correlations: each pose metric vs difficulty_score
+        METRICS = [
+            "hip_angle_deg", "tension_score", "com_height_norm",
+            "left_arm_reach_norm", "right_arm_reach_norm",
+            "hip_spread_deg", "elbow_l_deg", "elbow_r_deg",
+            "knee_l_deg", "knee_r_deg", "com_velocity",
+            "shoulder_rot_deg",
+        ]
+        correlations = {}
+        for metric in METRICS:
+            cur.execute(f"""
+                SELECT CORR(pf.{metric}, br.difficulty_score)
+                FROM pose_frames pf
+                JOIN board_routes br ON UPPER(br.external_id) = UPPER(pf.climb_uuid)
+                WHERE pf.{metric} IS NOT NULL AND br.difficulty_score IS NOT NULL
+            """)
+            val = cur.fetchone()[0]
+            correlations[metric] = round(float(val), 4) if val is not None else None
+
+        # Sort by absolute correlation strength
+        sorted_corr = sorted(
+            [{"metric": k, "r": v, "abs_r": abs(v) if v else 0} for k, v in correlations.items()],
+            key=lambda x: x["abs_r"], reverse=True
+        )
+
+        cur.close(); pg.close()
+        return jsonify({
+            "correlations":     sorted_corr,
+            "grade_benchmarks": grade_benchmarks,
+            "source":           "live",
+            "note": "r = Pearson correlation with difficulty_score. |r|>0.3 = meaningful signal for model."
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/pose/<climb_uuid>")
 def pose_for_climb(climb_uuid):
     """
@@ -1556,6 +1651,94 @@ def index():
         "/api/climber/benchmarks", "/api/climber/recommendations", "/api/climber/weak-points",
         "/api/gym/dashboard", "/api/gym/setting-recommendations", "/api/gym/route-performance",
     ]})
+
+
+@app.route("/api/routes/saved", methods=["GET"])
+def get_saved_routes():
+    """Return all routes saved by the user (stored in saved_routes table)."""
+    try:
+        pg  = get_pg()
+        cur = pg.cursor()
+        cur.execute("""
+            SELECT id, name, angle, predicted_grade, confidence, hold_count,
+                   holds_json, created_at
+            FROM saved_routes
+            ORDER BY created_at DESC
+            LIMIT 100
+        """)
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description]
+        cur.close(); pg.close()
+        routes = []
+        for row in rows:
+            r = dict(zip(cols, row))
+            if r.get("holds_json"):
+                try: r["holds"] = json.loads(r["holds_json"])
+                except: r["holds"] = []
+            del r["holds_json"]
+            if r.get("created_at"):
+                r["created_at"] = str(r["created_at"])
+            routes.append(r)
+        return jsonify({"routes": routes, "total": len(routes)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/routes/saved", methods=["POST"])
+def save_route():
+    """Save a user-created route. Creates the table if it doesn't exist."""
+    try:
+        pg  = get_pg()
+        cur = pg.cursor()
+
+        # Auto-create table on first save
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS saved_routes (
+                id           SERIAL PRIMARY KEY,
+                name         TEXT,
+                angle        INT DEFAULT 40,
+                predicted_grade TEXT,
+                confidence   FLOAT,
+                hold_count   INT,
+                holds_json   TEXT,
+                created_at   TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        pg.commit()
+
+        body    = request.get_json(force=True)
+        name    = body.get("name") or "Untitled Route"
+        angle   = int(body.get("angle") or 40)
+        grade   = body.get("predicted_grade") or ""
+        conf    = float(body.get("confidence") or 0)
+        holds   = body.get("holds") or []
+
+        cur.execute("""
+            INSERT INTO saved_routes (name, angle, predicted_grade, confidence, hold_count, holds_json)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (name, angle, grade, conf, len(holds), json.dumps(holds)))
+        new_id = cur.fetchone()[0]
+        pg.commit()
+        cur.close(); pg.close()
+
+        return jsonify({"id": new_id, "saved": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/routes/saved/<int:route_id>", methods=["DELETE"])
+def delete_saved_route(route_id):
+    """Delete a saved route by ID."""
+    try:
+        pg  = get_pg()
+        cur = pg.cursor()
+        cur.execute("DELETE FROM saved_routes WHERE id = %s", (route_id,))
+        pg.commit()
+        cur.close(); pg.close()
+        return jsonify({"deleted": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
