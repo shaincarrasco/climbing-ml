@@ -28,7 +28,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 MODEL_DIR   = PROJECT_ROOT / "ml"
 DATA_DIR    = PROJECT_ROOT / "data"
-SQLITE_PATH = Path(os.getenv("KILTER_DB_PATH", str(PROJECT_ROOT / "kilter.db")))
+SQLITE_PATH = Path(os.getenv("KILTER_DB_PATH", str(PROJECT_ROOT / "kilter.db"))).expanduser()
 
 # ── PostgreSQL connection pool ────────────────────────────────────────────────
 

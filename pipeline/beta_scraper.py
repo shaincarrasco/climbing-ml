@@ -214,6 +214,47 @@ def _extract_pose(
     )
 
 
+def _fetch_quality_data(attempt_id: str, climb_uuid: str | None) -> tuple[list[dict], str | None]:
+    """
+    After pose extraction, query back frame metrics + grade for quality scoring.
+    Returns (rows, grade) where rows is a list of metric dicts and grade is the V-grade string.
+    """
+    try:
+        import psycopg2
+        from dotenv import load_dotenv
+        load_dotenv(_BASE_DIR / ".env")
+        conn = psycopg2.connect(os.getenv("DATABASE_URL", "postgresql://localhost/climbing_platform"))
+        cur  = conn.cursor()
+
+        # Frame metrics for consistency + grade alignment scoring
+        cur.execute("""
+            SELECT hip_angle_deg, com_height_norm, tension_score,
+                   left_arm_reach_norm, right_arm_reach_norm
+            FROM pose_frames WHERE attempt_id = %s
+        """, (attempt_id,))
+        rows = [
+            {"hip_angle_deg": r[0], "com_height_norm": r[1], "tension_score": r[2],
+             "left_arm_reach_norm": r[3], "right_arm_reach_norm": r[4]}
+            for r in cur.fetchall()
+        ]
+
+        # Grade lookup
+        grade = None
+        if climb_uuid:
+            cur.execute(
+                "SELECT community_grade FROM board_routes WHERE UPPER(external_id) = UPPER(%s)",
+                (climb_uuid,),
+            )
+            row = cur.fetchone()
+            grade = row[0] if row else None
+
+        cur.close()
+        conn.close()
+        return rows, grade
+    except Exception:
+        return [], None
+
+
 # ── Process a pre-downloaded local directory ───────────────────────────────────
 def run_local(
     video_dir: Path,
@@ -412,12 +453,13 @@ def run_scrape(
             save_checkpoint({"completed": completed, "failed": failed})
             errors += 1
         else:
+            frame_rows, grade = _fetch_quality_data(attempt_id, c_uuid) if not dry_run else ([], None)
             quality = score_attempt(
                 attempt_id = attempt_id,
                 n_detected = n_frames,
                 n_sampled  = n_frames,
-                rows       = [],
-                grade      = None,      # grade unknown from Instagram link
+                rows       = frame_rows,
+                grade      = grade,
             )
             print(f"    Pose frames : {n_frames}  quality={quality.score:.0f}/100 [{quality.label}]")
             if quality.flags:

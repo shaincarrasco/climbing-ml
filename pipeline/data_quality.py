@@ -131,8 +131,15 @@ def _detection(n_detected: int, n_sampled: int) -> float:
 
 def _consistency(rows: list[dict]) -> tuple[float, list[str]]:
     """
-    25 pts — how stable the key metrics are across frames.
-    High variance means chaotic pose (non-climbing footage, camera shaking, etc.)
+    25 pts — checks that frame-to-frame changes are smooth and physically plausible.
+
+    Climbing videos are expected to have moderate metric variance (the climber is
+    moving). What we detect here is:
+      - Too little variance → person is standing still, not actually climbing
+      - Too much frame-to-frame jumping → camera noise, bad detection, phone in pocket
+
+    We score on per-frame delta stability, not raw CV, so actual climbing motion
+    (smooth trajectory through hip/com/tension space) scores well.
     """
     flags = []
     if len(rows) < 5:
@@ -140,24 +147,38 @@ def _consistency(rows: list[dict]) -> tuple[float, list[str]]:
         return 0.0, flags
 
     metrics = ["hip_angle_deg", "com_height_norm", "tension_score"]
-    cvs = []
+    delta_cvs = []
+
     for key in metrics:
         vals = [r[key] for r in rows if r.get(key) is not None]
-        if len(vals) < 3:
+        if len(vals) < 4:
             continue
-        mean = statistics.mean(vals)
-        std  = statistics.stdev(vals)
-        if mean != 0:
-            cvs.append(std / abs(mean))
 
-    if not cvs:
-        return 0.0, flags
+        # Frame-to-frame deltas
+        deltas = [abs(vals[i] - vals[i - 1]) for i in range(1, len(vals))]
+        mean_delta = statistics.mean(deltas)
+        std_delta  = statistics.stdev(deltas) if len(deltas) > 1 else 0.0
 
-    avg_cv = statistics.mean(cvs)
-    # CV < 0.10 → very consistent (full marks); > 0.60 → noisy (0 pts)
-    score = round(25.0 * max(0.0, min(1.0, (0.60 - avg_cv) / 0.50)), 1)
-    if avg_cv > 0.40:
-        flags.append("high_metric_variance")
+        # CV of deltas: low = smooth motion, high = erratic jumps
+        if mean_delta > 0:
+            delta_cvs.append(std_delta / mean_delta)
+
+        # Sanity: if mean delta is near zero the person wasn't moving
+        if key == "com_height_norm" and mean_delta < 0.001:
+            flags.append("static_com_height")
+
+    if not delta_cvs:
+        return 5.0, flags   # partial credit if we can't compute
+
+    avg_delta_cv = statistics.mean(delta_cvs)
+    # delta_cv < 0.5 → smooth climbing motion (full marks)
+    # delta_cv 0.5–2.0 → slightly erratic
+    # delta_cv > 2.0   → chaotic, non-climbing footage
+    score = round(25.0 * max(0.0, min(1.0, (2.0 - avg_delta_cv) / 1.5)), 1)
+
+    if avg_delta_cv > 1.5:
+        flags.append("erratic_pose_motion")
+
     return score, flags
 
 
@@ -203,11 +224,15 @@ def _grade_alignment(rows: list[dict], grade: str | None) -> tuple[float, list[s
     if None in (vid_hip, vid_com, vid_ten, vid_reach):
         return 12.5, flags
 
-    # Normalise each dimension by expected range across grades
-    hip_range   = 50.0   # V0=120 → V14=70
-    com_range   = 0.09   # 0.55 → 0.64
-    ten_range   = 0.49   # 0.30 → 0.79
-    reach_range = 0.17   # 0.65 → 0.82
+    # Normalise each dimension by 2× the grade spread — this represents how far
+    # you'd have to be from the benchmark to be clearly at the wrong grade.
+    # com_range was previously 0.09 (total grade span), which made any small
+    # COM deviation dominate the distance. Using 2× the span as the tolerance
+    # band means d=1.0 only when you're off by the full 15-grade range.
+    hip_range   = 100.0  # allow ±2 full grade spans before penalising
+    com_range   = 0.20   # was 0.09 — way too tight; 0.20 is ≈ 2× the full range
+    ten_range   = 0.98   # 2× the full tension range
+    reach_range = 0.34   # 2× the full reach range
 
     d = math.sqrt(
         ((vid_hip   - bm_hip)   / hip_range)   ** 2 +
@@ -216,7 +241,7 @@ def _grade_alignment(rows: list[dict], grade: str | None) -> tuple[float, list[s
         ((vid_reach - bm_reach) / reach_range) ** 2
     )
 
-    # d=0 → perfect match (25 pts); d≥1 → grade misalignment (0 pts)
+    # d=0 → perfect match (25 pts); d≥1 → clear grade misalignment (0 pts)
     score = round(25.0 * max(0.0, 1.0 - d), 1)
     if d > 0.6:
         flags.append(f"grade_mismatch_{grade}_distance_{d:.2f}")
