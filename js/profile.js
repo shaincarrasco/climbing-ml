@@ -175,6 +175,43 @@ function saveClimberProfile() {
   }
   // Notify creator figure
   if (typeof _updateCreatorFigure === 'function') _updateCreatorFigure();
+
+  // Sync body dimensions to DB (async, non-blocking)
+  // This enables PDScore to use server-side affinities when a climber_id is set.
+  _syncProfileToDB(p);
+}
+
+async function _syncProfileToDB(p) {
+  try {
+    var h  = p.height,   ws = p.wingspan, wt = p.weight;
+    if (p.units === 'imperial') {
+      h  = h  ? h  * 2.54      : null;
+      ws = ws ? ws * 2.54      : null;
+      wt = wt ? wt * 0.453592  : null;
+    }
+    // Only sync if body dims are set (no point creating empty profile rows)
+    if (!h && !ws) return;
+
+    var body = {
+      height_cm:    h,
+      wingspan_cm:  ws,
+      weight_kg:    wt || null,
+      onsight_grade: p.onsight || null,
+      experience_yrs: p.experience ? parseFloat(p.experience) : null,
+    };
+    var savedId = localStorage.getItem('climberId');
+    if (savedId) body.id = savedId;
+
+    var res  = await fetch(API + '/api/climber/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      var d = await res.json();
+      if (d.id) localStorage.setItem('climberId', d.id);
+    }
+  } catch(e) { /* fail silently — DB sync is best-effort */ }
 }
 
 function updateDerived() {
@@ -280,6 +317,139 @@ function _numVal(id) {
   if (!el || el.value === '') return null;
   var n = parseFloat(el.value);
   return isNaN(n) ? null : n;
+}
+
+// ── Video Coach ───────────────────────────────────────────────────────────────
+
+var _coachPollInterval = null;
+
+function handleCoachDrop(e) {
+  e.preventDefault();
+  var dropZone = document.getElementById('coach-drop-zone');
+  if (dropZone) dropZone.style.borderColor = 'var(--border)';
+  var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (file) uploadCoachVideo(file);
+}
+
+async function uploadCoachVideo(file) {
+  if (!file) return;
+  var statusEl = document.getElementById('coach-status');
+  if (!statusEl) return;
+
+  var MAX_MB = 200;
+  if (file.size > MAX_MB * 1024 * 1024) {
+    _coachStatus('error', 'File is too large (max ' + MAX_MB + 'MB).');
+    return;
+  }
+
+  var grade  = (document.getElementById('coach-grade')  || {}).value || '';
+  var angle  = (document.getElementById('coach-angle')  || {}).value || '40';
+  var cid    = localStorage.getItem('climberId') || '';
+
+  var fd = new FormData();
+  fd.append('video', file);
+  fd.append('board_angle_deg', angle);
+  if (grade) fd.append('self_reported_grade', grade);
+  if (cid)   fd.append('climber_id', cid);
+
+  _coachStatus('loading',
+    '<div style="font-size:11px;color:var(--chalk);">Uploading…</div>' +
+    '<div style="font-size:10px;color:var(--mist);margin-top:4px;">' + file.name + '</div>');
+
+  try {
+    var res  = await fetch(API + '/api/pose/upload', { method: 'POST', body: fd });
+    var data = await res.json();
+    if (data.error) { _coachStatus('error', data.error); return; }
+
+    _coachStatus('loading',
+      '<div style="font-size:11px;color:var(--chalk);">Processing video — extracting pose…</div>' +
+      '<div style="font-size:10px;color:var(--mist);margin-top:4px;">This takes about 1–2 minutes per minute of footage.</div>');
+
+    // Poll for results
+    if (_coachPollInterval) clearInterval(_coachPollInterval);
+    _coachPollInterval = setInterval(function() {
+      _pollCoachSession(data.session_id);
+    }, 4000);
+  } catch(e) {
+    _coachStatus('error', 'Upload failed — is the API running?');
+  }
+}
+
+async function _pollCoachSession(sessionId) {
+  try {
+    var res  = await fetch(API + '/api/pose/session/' + sessionId);
+    var data = await res.json();
+
+    if (data.status === 'done') {
+      clearInterval(_coachPollInterval);
+      _renderCoachResults(data);
+    } else if (data.status === 'failed') {
+      clearInterval(_coachPollInterval);
+      _coachStatus('error', 'Processing failed: ' + (data.error || 'unknown error'));
+    }
+    // still 'processing' → keep polling
+  } catch(e) { /* network blip — keep polling */ }
+}
+
+function _coachStatus(type, html) {
+  var el = document.getElementById('coach-status');
+  if (!el) return;
+  el.style.display = '';
+  var colors = { loading: 'var(--mist)', error: 'var(--coral)', success: 'var(--teal)' };
+  el.style.color = colors[type] || 'var(--mist)';
+  el.innerHTML = html;
+}
+
+function _renderCoachResults(data) {
+  var _SEVERITY_COLOR = { high: 'var(--coral)', medium: '#f59e0b', low: 'var(--mist)' };
+  var _CATEGORY_ICON  = { tension: '⚡', arms: '💪', hips: '🦴', sequencing: '🔄', footwork: '🦶' };
+  var _VERDICT_BADGE  = {
+    good:        '<span style="background:rgba(0,212,184,0.15);color:var(--teal);border:1px solid var(--teal);border-radius:4px;padding:2px 8px;font-size:10px;">CLEAN</span>',
+    needs_work:  '<span style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid #f59e0b;border-radius:4px;padding:2px 8px;font-size:10px;">NEEDS WORK</span>',
+    critical:    '<span style="background:rgba(224,92,58,0.15);color:var(--coral);border:1px solid var(--coral);border-radius:4px;padding:2px 8px;font-size:10px;">CRITICAL</span>',
+    no_data:     '<span style="border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--mist);">NO DATA</span>',
+  };
+
+  var insightsHTML = (data.insights || []).map(function(ins) {
+    var color = _SEVERITY_COLOR[ins.severity] || 'var(--mist)';
+    var icon  = _CATEGORY_ICON[ins.category]  || '•';
+    var drillsHTML = (ins.drills || []).map(function(d) {
+      return '<li style="font-size:10px;color:var(--mist);margin-bottom:3px;">' + d + '</li>';
+    }).join('');
+    return '<div style="padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+        '<span style="font-size:16px;">' + icon + '</span>' +
+        '<span style="font-size:11px;font-weight:700;color:' + color + ';text-transform:capitalize;">' +
+          ins.category.replace('_',' ') + '</span>' +
+        '<span style="margin-left:auto;font-size:9px;font-weight:700;color:' + color + ';text-transform:uppercase;">' +
+          ins.severity + '</span>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--chalk);line-height:1.5;margin-bottom:' +
+        (drillsHTML ? '8px' : '0') + ';">' + ins.message + '</div>' +
+      (drillsHTML ? '<ul style="margin:0;padding-left:14px;">' + drillsHTML + '</ul>' : '') +
+    '</div>';
+  }).join('');
+
+  var strengthsHTML = (data.strengths || []).map(function(s) {
+    return '<div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--teal);">' +
+      '<span>✓</span><span>' + s + '</span></div>';
+  }).join('');
+
+  var html =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">' +
+      (_VERDICT_BADGE[data.overall_verdict] || '') +
+      '<span style="font-size:10px;color:var(--mist);">' + (data.frame_count || 0) + ' frames analysed</span>' +
+      (data.grade ? '<span style="font-size:10px;color:var(--mist);">· ' + data.grade + '</span>' : '') +
+    '</div>' +
+    (data.summary ? '<div style="font-size:11px;color:var(--chalk);line-height:1.5;margin-bottom:12px;padding:10px;background:rgba(255,255,255,0.03);border-radius:6px;">' + data.summary + '</div>' : '') +
+    (strengthsHTML ? '<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;">' + strengthsHTML + '</div>' : '') +
+    insightsHTML +
+    '<button class="btn btn-ghost" style="width:100%;margin-top:4px;font-size:10px;" ' +
+      'onclick="document.getElementById(\'coach-status\').style.display=\'none\';' +
+      'document.getElementById(\'coach-drop-zone\').style.display=\'\';">Upload Another</button>';
+
+  document.getElementById('coach-drop-zone').style.display = 'none';
+  _coachStatus('success', html);
 }
 
 // ── Joint Reference Grid ──────────────────────────────────────────────────────

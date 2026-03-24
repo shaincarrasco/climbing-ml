@@ -1,3 +1,5 @@
+import uuid
+
 from flask import Blueprint, jsonify, request
 
 from api.db import get_pg
@@ -211,6 +213,183 @@ def climber_weak_points():
             "weak_points":    weak_points,
             "data_available": bool(current and target),
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Climber Profile CRUD ──────────────────────────────────────────────────────
+
+@bp.route("/api/climber/profile", methods=["POST"])
+def upsert_profile():
+    """
+    Create or update a climber profile.
+
+    Body: {id?, display_name?, height_cm?, wingspan_cm?, weight_kg?,
+           shoe_size_eu?, onsight_grade?, experience_yrs?,
+           preferred_angle?, preferred_style?}
+
+    If `id` is omitted a new UUID is generated and returned.
+    The `id` should be stored in browser localStorage for future calls.
+    """
+    data = request.get_json(silent=True) or {}
+    climber_id = data.get("id") or str(uuid.uuid4())
+
+    fields = ["display_name", "height_cm", "wingspan_cm", "weight_kg",
+              "shoe_size_eu", "onsight_grade", "experience_yrs",
+              "preferred_angle", "preferred_style"]
+    updates = {k: data[k] for k in fields if k in data}
+
+    try:
+        with get_pg() as pg:
+            cur = pg.cursor()
+            # Upsert: insert if new, update if existing
+            cur.execute("""
+                INSERT INTO climber_profiles (id, last_active_at)
+                VALUES (%s, NOW())
+                ON CONFLICT (id) DO UPDATE SET last_active_at = NOW()
+            """, (climber_id,))
+            if updates:
+                set_clause = ", ".join(f"{k} = %s" for k in updates)
+                cur.execute(
+                    f"UPDATE climber_profiles SET {set_clause} WHERE id = %s",
+                    list(updates.values()) + [climber_id],
+                )
+            pg.commit()
+        return jsonify({"id": climber_id, "updated": list(updates.keys())})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/climber/profile/<climber_id>", methods=["GET"])
+def get_profile(climber_id):
+    """Return profile + move affinities for a climber."""
+    try:
+        with get_pg() as pg:
+            cur = pg.cursor()
+            cur.execute("""
+                SELECT id, display_name, height_cm, wingspan_cm, weight_kg,
+                       shoe_size_eu, ape_index_cm, bmi, onsight_grade,
+                       experience_yrs, preferred_angle, preferred_style, created_at
+                FROM climber_profiles WHERE id = %s
+            """, (climber_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Profile not found"}), 404
+
+            profile = dict(zip(
+                ["id","display_name","height_cm","wingspan_cm","weight_kg",
+                 "shoe_size_eu","ape_index_cm","bmi","onsight_grade",
+                 "experience_yrs","preferred_angle","preferred_style","created_at"],
+                row,
+            ))
+            # Serialize non-JSON-safe types
+            if profile["created_at"]:
+                profile["created_at"] = profile["created_at"].isoformat()
+
+            cur.execute("""
+                SELECT move_type, attempts, sends, success_rate, avg_attempts_to_send
+                FROM climber_move_affinity WHERE climber_id = %s
+                ORDER BY move_type
+            """, (climber_id,))
+            affinities = [
+                {"move_type": r[0], "attempts": r[1], "sends": r[2],
+                 "success_rate": float(r[3]) if r[3] is not None else None,
+                 "avg_attempts_to_send": float(r[4]) if r[4] is not None else None}
+                for r in cur.fetchall()
+            ]
+
+        return jsonify({"profile": profile, "affinities": affinities})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/climber/log-send", methods=["POST"])
+def log_send():
+    """
+    Log a route send and update move affinities.
+
+    Body: {climber_id, route_id (UUID), attempts, board_angle_deg?, notes?}
+    """
+    data       = request.get_json(silent=True) or {}
+    climber_id = data.get("climber_id")
+    route_id   = data.get("route_id")
+    attempts   = int(data.get("attempts", 1))
+
+    if not climber_id or not route_id:
+        return jsonify({"error": "climber_id and route_id required"}), 400
+
+    try:
+        with get_pg() as pg:
+            cur = pg.cursor()
+
+            # Fetch route snapshot
+            cur.execute(
+                "SELECT community_grade, difficulty_score FROM board_routes WHERE id = %s",
+                (route_id,),
+            )
+            route_row = cur.fetchone()
+            if not route_row:
+                return jsonify({"error": "Route not found"}), 404
+            route_grade, route_score = route_row
+
+            # Log send (ignore duplicate for same day via ON CONFLICT DO NOTHING)
+            cur.execute("""
+                INSERT INTO route_sends
+                    (climber_id, route_id, attempts, board_angle_deg, notes,
+                     route_grade, route_difficulty_score)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (climber_id, route_id) DO UPDATE
+                    SET attempts = EXCLUDED.attempts,
+                        sent_at  = NOW(),
+                        notes    = COALESCE(EXCLUDED.notes, route_sends.notes)
+            """, (
+                climber_id, route_id, attempts,
+                data.get("board_angle_deg"), data.get("notes"),
+                route_grade, route_score,
+            ))
+
+            # Compute move types from route holds to update move affinities
+            cur.execute("""
+                SELECT position_x_cm, position_y_cm, role, hold_type, board_angle_deg
+                FROM route_holds WHERE route_id = %s
+            """, (route_id,))
+            hold_rows = cur.fetchall()
+            if hold_rows:
+                from api.ml_engine import compute_features
+                from api.pdscore import _classify_moves
+                holds_for_feat = [
+                    {"x_cm": r[0], "y_cm": r[1], "role": r[2], "hold_type": r[3]}
+                    for r in hold_rows if r[0] is not None
+                ]
+                angle_for_feat = next(
+                    (r[4] for r in hold_rows if r[4] is not None),
+                    data.get("board_angle_deg", 40),
+                )
+                feats      = compute_features(holds_for_feat, int(angle_for_feat)) or {}
+                move_types = _classify_moves(feats)
+                for mt in move_types:
+                    cur.execute("""
+                        INSERT INTO climber_move_affinity (climber_id, move_type, attempts, sends, avg_attempts_to_send)
+                        VALUES (%s, %s, %s, 1, %s)
+                        ON CONFLICT (climber_id, move_type) DO UPDATE
+                            SET attempts             = climber_move_affinity.attempts + EXCLUDED.attempts,
+                                sends                = climber_move_affinity.sends + 1,
+                                avg_attempts_to_send = (
+                                    COALESCE(climber_move_affinity.avg_attempts_to_send, 0)
+                                    * climber_move_affinity.sends
+                                    + EXCLUDED.avg_attempts_to_send
+                                ) / (climber_move_affinity.sends + 1),
+                                last_updated         = NOW()
+                    """, (climber_id, mt, attempts, float(attempts)))
+
+            # Update last_active_at
+            cur.execute(
+                "UPDATE climber_profiles SET last_active_at = NOW() WHERE id = %s",
+                (climber_id,),
+            )
+            pg.commit()
+
+        return jsonify({"logged": True, "route_grade": route_grade})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

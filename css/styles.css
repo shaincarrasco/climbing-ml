@@ -525,6 +525,22 @@ nav {
 }
 .hc-chip b { font-weight: 700; }
 
+/* ── GRADE CHIPS (auto-generate grade picker) ── */
+.grade-chip {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'Space Mono', monospace;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--mist);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.grade-chip:hover { border-color: var(--chalk); color: var(--chalk); }
+.grade-chip.active { background: var(--teal); border-color: var(--teal); color: var(--bg); }
+
 /* ── BUTTONS ── */
 .btn {
   padding: 8px 16px;

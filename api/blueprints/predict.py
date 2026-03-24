@@ -4,10 +4,12 @@ import numpy as np
 from flask import Blueprint, jsonify, request
 
 from api.board_config import get_board_holds
+from api.db import get_pg
 from api.ml_engine import (
     cache_get, cache_set, compute_features, get_model,
     make_cache_key, score_to_grade, _dist,
 )
+from api.pdscore import compute_pdscore
 
 bp = Blueprint("predict", __name__)
 
@@ -24,8 +26,10 @@ def predict():
     if not data:
         return jsonify({"error": "JSON body required"}), 400
 
-    holds = data.get("holds", [])
-    angle = int(data.get("angle", 40))
+    holds      = data.get("holds", [])
+    angle      = int(data.get("angle", 40))
+    climber_id = data.get("climber_id")      # optional UUID from localStorage
+    profile_in = data.get("profile") or {}   # optional inline profile dict
 
     if len(holds) < 2:
         return jsonify({"error": "Need at least 2 holds"}), 400
@@ -83,6 +87,40 @@ def predict():
     }
 
     cache_set(cache_key, result)
+
+    # ── Personal difficulty score (optional, not cached — it's per-climber) ────
+    profile    = dict(profile_in)
+    affinities = {}
+    if climber_id:
+        try:
+            with get_pg() as pg:
+                cur = pg.cursor()
+                cur.execute(
+                    "SELECT height_cm, wingspan_cm, weight_kg FROM climber_profiles WHERE id = %s",
+                    (climber_id,),
+                )
+                row = cur.fetchone()
+                if row:
+                    profile.setdefault("height_cm",   row[0])
+                    profile.setdefault("wingspan_cm",  row[1])
+                    profile.setdefault("weight_kg",    row[2])
+                cur.execute(
+                    "SELECT move_type, success_rate FROM climber_move_affinity WHERE climber_id = %s",
+                    (climber_id,),
+                )
+                affinities = {r[0]: float(r[1]) for r in cur.fetchall() if r[1] is not None}
+        except Exception:
+            pass
+
+    if profile.get("height_cm") and profile.get("wingspan_cm"):
+        try:
+            pd = compute_pdscore(score, features, profile, affinities, boundaries)
+            result["pd_personal"]  = pd["pd_personal"]
+            result["pdscore"]      = pd["pdscore"]
+            result["pd_modifiers"] = pd["modifiers"]
+        except Exception:
+            pass
+
     return jsonify(result)
 
 
@@ -140,16 +178,32 @@ def suggest():
     return jsonify({"suggestions": candidates[:count]})
 
 
+_GRADE_TO_SCORE = {
+    "V0": 0.30, "V1": 0.35, "V2": 0.40, "V3": 0.45, "V4": 0.50,
+    "V5": 0.55, "V6": 0.60, "V7": 0.65, "V8": 0.70, "V9": 0.74,
+    "V10": 0.78, "V11": 0.82, "V12": 0.85, "V13": 0.89, "V14": 0.94,
+}
+
+
 @bp.route("/api/auto_generate", methods=["POST"])
 def auto_generate():
     """
     Auto-generate a complete route.
-    Body: {"angle": int, "difficulty": float 0–1, "hold_count": int}
+    Body: {"angle": int, "difficulty": float 0–1, "grade": "V6", "hold_count": int}
+
+    `grade` takes precedence over `difficulty` when provided.
     """
     data       = request.get_json(silent=True) or {}
     angle      = int(data.get("angle", 40))
-    difficulty = float(data.get("difficulty", 0.4))
     hold_count = min(int(data.get("hold_count", 8)), 16)
+
+    # Grade string → difficulty float (with small random jitter so each generation differs)
+    grade_str  = data.get("grade", "").strip().upper()
+    if grade_str in _GRADE_TO_SCORE:
+        base_diff  = _GRADE_TO_SCORE[grade_str]
+        difficulty = max(0.05, min(0.95, base_diff + random.uniform(-0.03, 0.03)))
+    else:
+        difficulty = float(data.get("difficulty", 0.4))
     board_data = get_board_holds()
 
     all_holds = [h for h in board_data["holds"] if h["hold_type"] != "foot"]

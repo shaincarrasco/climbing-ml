@@ -194,6 +194,14 @@
         <div class="grade-ticks">
           <span>V0</span><span>V4</span><span>V8</span><span>V12</span><span>V14</span>
         </div>
+        <!-- Personal difficulty score — only visible when profile body dims are set -->
+        <div id="pred-pd-grade" style="display:none;margin-top:10px;padding:8px 10px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.25);border-radius:6px;">
+          <div style="font-size:9px;color:var(--mist);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;">Personal Difficulty · 1–10</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span id="pred-pd-grade-val" style="font-size:26px;font-weight:700;font-family:'Space Mono',monospace;">—</span>
+            <span style="font-size:10px;color:var(--mist);">adjusted for your body &amp; move history</span>
+          </div>
+        </div>
       </div>
 
       <!-- DNA bars -->
@@ -210,7 +218,22 @@
       <!-- Auto-Generate -->
       <div class="creator-section" style="border-top:1px solid var(--border);padding-top:10px;">
         <div class="creator-label">Auto-Generate Route</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <!-- Grade picker: specific grade OR freeform slider -->
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;" id="auto-grade-chips">
+          <span style="font-size:9px;color:var(--mist);width:100%;margin-bottom:3px;">Target Grade</span>
+          <button class="grade-chip" onclick="selectAutoGrade(this,'')">Freeform</button>
+          <button class="grade-chip" onclick="selectAutoGrade(this,'V1')">V1</button>
+          <button class="grade-chip" onclick="selectAutoGrade(this,'V2')">V2</button>
+          <button class="grade-chip" onclick="selectAutoGrade(this,'V3')">V3</button>
+          <button class="grade-chip" onclick="selectAutoGrade(this,'V4')">V4</button>
+          <button class="grade-chip" onclick="selectAutoGrade(this,'V5')">V5</button>
+          <button class="grade-chip" onclick="selectAutoGrade(this,'V6')">V6</button>
+          <button class="grade-chip" onclick="selectAutoGrade(this,'V7')">V7</button>
+          <button class="grade-chip" onclick="selectAutoGrade(this,'V8')">V8</button>
+          <button class="grade-chip" onclick="selectAutoGrade(this,'V10')">V10</button>
+        </div>
+        <!-- Freeform slider — hidden when a specific grade is chosen -->
+        <div id="auto-difficulty-row" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
           <span style="font-size:10px;color:var(--mist);min-width:38px;">Easy</span>
           <input type="range" id="auto-difficulty" min="0" max="1" step="0.05" value="0.4" style="flex:1;">
           <span style="font-size:10px;color:var(--mist);min-width:36px;text-align:right;">Hard</span>
@@ -463,6 +486,53 @@
         <div id="profile-recs-content">
           <div style="font-size:11px;color:var(--mist);">Set your grade in the profile above to load recommendations.</div>
         </div>
+      </div>
+
+      <!-- ── Video Coach ──────────────────────────────────────────────── -->
+      <div class="ba-row" style="flex:none;padding:20px 24px;flex-direction:column;gap:14px;">
+        <div class="ba-title">Video Coach
+          <span style="font-size:9px;color:var(--mist);font-weight:400;margin-left:6px;">upload a clip · get AI coaching</span>
+        </div>
+
+        <!-- Drop zone -->
+        <div id="coach-drop-zone" style="
+            border:2px dashed var(--border);border-radius:10px;padding:28px 16px;
+            text-align:center;cursor:pointer;transition:border-color 0.15s;
+            background:rgba(255,255,255,0.01);"
+          onclick="document.getElementById('coach-file-input').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--teal)'"
+          ondragleave="this.style.borderColor='var(--border)'"
+          ondrop="handleCoachDrop(event)">
+          <div style="font-size:24px;margin-bottom:8px;">🎥</div>
+          <div style="font-size:12px;color:var(--chalk);">Drop your climbing video here</div>
+          <div style="font-size:10px;color:var(--mist);margin-top:4px;">mp4 / mov / avi · max 200MB</div>
+          <input type="file" id="coach-file-input" accept="video/*" style="display:none"
+            onchange="uploadCoachVideo(this.files[0])">
+        </div>
+
+        <!-- Optional context fields -->
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="coach-grade" style="flex:1;padding:6px 8px;font-size:11px;background:var(--panel);
+              border:1px solid var(--border);border-radius:6px;color:var(--chalk);">
+            <option value="">Grade (optional)</option>
+            <option>V0</option><option>V1</option><option>V2</option><option>V3</option>
+            <option>V4</option><option>V5</option><option>V6</option><option>V7</option>
+            <option>V8</option><option>V9</option><option>V10</option><option>V11</option>
+            <option>V12</option><option>V13</option><option>V14</option>
+          </select>
+          <select id="coach-angle" style="flex:1;padding:6px 8px;font-size:11px;background:var(--panel);
+              border:1px solid var(--border);border-radius:6px;color:var(--chalk);">
+            <option value="15">15° Slab</option>
+            <option value="30">30°</option>
+            <option value="40" selected>40° Standard</option>
+            <option value="50">50°</option>
+            <option value="55">55°</option>
+            <option value="65">65°</option>
+          </select>
+        </div>
+
+        <!-- Upload progress / results -->
+        <div id="coach-status" style="display:none;"></div>
       </div>
 
     </div>

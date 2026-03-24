@@ -1,9 +1,12 @@
 import json
 import os
 import sys
+import tempfile
+import uuid as _uuid
 
 import sqlite3
 from flask import Blueprint, jsonify, request
+from werkzeug.utils import secure_filename
 
 from api.db import DATA_DIR, MODEL_DIR, SQLITE_PATH, get_pg
 
@@ -337,3 +340,227 @@ def pose_predictions():
         return jsonify({"routes": results, "total": len(results)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ── Video Upload + Coaching ───────────────────────────────────────────────────
+
+_ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"}
+_MAX_UPLOAD_MB      = 200
+
+
+@bp.route("/api/pose/upload", methods=["POST"])
+def upload_video():
+    """
+    Upload a climbing video for pose extraction + coaching analysis.
+
+    Multipart form fields:
+      video             — video file (required)
+      climber_id        — UUID from localStorage (optional)
+      board_angle_deg   — int, default 40 (optional)
+      self_reported_grade — e.g. 'V6' (optional, improves coaching benchmarks)
+
+    Returns immediately with {session_id, status: 'processing'}.
+    Poll GET /api/pose/session/<session_id> for results.
+    """
+    if "video" not in request.files:
+        return jsonify({"error": "No video file attached (field name: 'video')"}), 400
+
+    f         = request.files["video"]
+    filename  = secure_filename(f.filename or "upload.mp4")
+    ext       = os.path.splitext(filename)[1].lower()
+    if ext not in _ALLOWED_VIDEO_EXTS:
+        return jsonify({"error": f"Unsupported format {ext}. Use mp4/mov/avi."}), 400
+
+    # Check file size before saving
+    f.seek(0, 2)
+    size_bytes = f.tell()
+    f.seek(0)
+    if size_bytes > _MAX_UPLOAD_MB * 1024 * 1024:
+        return jsonify({"error": f"File too large (max {_MAX_UPLOAD_MB}MB)"}), 413
+
+    session_id  = str(_uuid.uuid4())
+    climber_id  = request.form.get("climber_id")
+    angle       = int(request.form.get("board_angle_deg", 40))
+    grade       = request.form.get("self_reported_grade", "").strip() or None
+
+    # Save to temp file
+    tmp_dir  = tempfile.mkdtemp(prefix="climb_upload_")
+    tmp_path = os.path.join(tmp_dir, f"{session_id}{ext}")
+    f.save(tmp_path)
+
+    try:
+        with get_pg() as pg:
+            cur = pg.cursor()
+            cur.execute("""
+                INSERT INTO video_upload_sessions
+                    (id, climber_id, original_filename, file_size_bytes,
+                     board_angle_deg, self_reported_grade, status)
+                VALUES (%s, %s, %s, %s, %s, %s, 'pending')
+            """, (session_id, climber_id, filename, size_bytes, angle, grade))
+            pg.commit()
+    except Exception as e:
+        return jsonify({"error": f"DB error: {e}"}), 500
+
+    # Process in background thread so the HTTP response returns immediately
+    import threading
+    t = threading.Thread(
+        target=_process_upload,
+        args=(session_id, tmp_path, angle, grade, climber_id),
+        daemon=True,
+    )
+    t.start()
+
+    return jsonify({
+        "session_id": session_id,
+        "status":     "processing",
+        "message":    "Upload received. Poll /api/pose/session/" + session_id + " for results.",
+    })
+
+
+@bp.route("/api/pose/session/<session_id>")
+def get_session(session_id):
+    """Poll for upload processing status and coaching results."""
+    try:
+        with get_pg() as pg:
+            cur = pg.cursor()
+            cur.execute("""
+                SELECT status, overall_verdict, summary_text, frames_extracted,
+                       processed_at, error_message, self_reported_grade,
+                       board_angle_deg, original_filename
+                FROM video_upload_sessions WHERE id = %s
+            """, (session_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({"error": "Session not found"}), 404
+
+            status = row[0]
+            result = {
+                "session_id":       session_id,
+                "status":           status,
+                "overall_verdict":  row[1],
+                "summary":          row[2],
+                "frames_extracted": row[3],
+                "processed_at":     row[4].isoformat() if row[4] else None,
+                "error":            row[5],
+                "grade":            row[6],
+                "angle":            row[7],
+                "filename":         row[8],
+                "insights":         [],
+            }
+
+            if status == "done":
+                cur.execute("""
+                    SELECT category, severity, message, score, benchmark, drills
+                    FROM coaching_insights WHERE session_id = %s
+                    ORDER BY
+                        CASE severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END
+                """, (session_id,))
+                result["insights"] = [
+                    {"category": r[0], "severity": r[1], "message": r[2],
+                     "score": r[3], "benchmark": r[4], "drills": r[5] or []}
+                    for r in cur.fetchall()
+                ]
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def _process_upload(session_id: str, video_path: str, angle: int,
+                    grade: str | None, climber_id: str | None):
+    """Background worker: extract pose frames and run coaching analysis."""
+    import traceback
+    attempt_id = session_id  # reuse session UUID as the attempt grouping key
+
+    def _set_status(status, **kwargs):
+        try:
+            with get_pg() as pg:
+                cur = pg.cursor()
+                sets = ["status = %s"] + [f"{k} = %s" for k in kwargs]
+                vals = [status] + list(kwargs.values()) + [session_id]
+                cur.execute(
+                    f"UPDATE video_upload_sessions SET {', '.join(sets)} WHERE id = %s",
+                    vals,
+                )
+                pg.commit()
+        except Exception:
+            pass
+
+    _set_status("processing")
+
+    try:
+        # ── Step 1: Run pose extractor ─────────────────────────────────────
+        project_root = str(DATA_DIR.parent)
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+
+        from pipeline.pose_extractor import process_video
+        n_frames = process_video(video_path, attempt_id=attempt_id, climb_uuid=None)
+
+        # ── Step 2: Fetch extracted frames ────────────────────────────────
+        with get_pg() as pg:
+            cur = pg.cursor()
+            cur.execute("""
+                SELECT tension_score, com_height_norm, hip_angle_deg,
+                       is_straight_arm_l, is_straight_arm_r,
+                       left_arm_reach_norm, right_arm_reach_norm,
+                       hip_spread_deg
+                FROM pose_frames WHERE attempt_id = %s
+            """, (attempt_id,))
+            frame_rows = [
+                {
+                    "tension_score":        r[0],
+                    "com_height_norm":      r[1],
+                    "hip_angle_deg":        r[2],
+                    "is_straight_arm_l":    r[3],
+                    "is_straight_arm_r":    r[4],
+                    "left_arm_reach_norm":  r[5],
+                    "right_arm_reach_norm": r[6],
+                    "hip_spread_deg":       r[7],
+                }
+                for r in cur.fetchall()
+            ]
+
+        # ── Step 3: Run coaching analysis ─────────────────────────────────
+        from api.video_coach import analyse_attempt
+        analysis = analyse_attempt(frame_rows, grade=grade)
+
+        # ── Step 4: Persist insights + update session ─────────────────────
+        with get_pg() as pg:
+            cur = pg.cursor()
+            for insight in analysis["insights"]:
+                cur.execute("""
+                    INSERT INTO coaching_insights
+                        (session_id, category, severity, message, score, benchmark, drills)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    session_id,
+                    insight["category"],
+                    insight["severity"],
+                    insight["message"],
+                    insight.get("score"),
+                    insight.get("benchmark"),
+                    insight.get("drills", []),
+                ))
+            cur.execute("""
+                UPDATE video_upload_sessions
+                SET status = 'done',
+                    frames_extracted = %s,
+                    overall_verdict  = %s,
+                    summary_text     = %s,
+                    attempt_id       = %s,
+                    processed_at     = NOW()
+                WHERE id = %s
+            """, (n_frames, analysis["overall"], analysis["summary"], attempt_id, session_id))
+            pg.commit()
+
+    except Exception:
+        err = traceback.format_exc()
+        _set_status("failed", error_message=err[:1000])
+    finally:
+        # Always delete the video file — only pose data is retained
+        try:
+            os.remove(video_path)
+            os.rmdir(os.path.dirname(video_path))
+        except Exception:
+            pass

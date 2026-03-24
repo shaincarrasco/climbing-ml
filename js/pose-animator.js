@@ -558,10 +558,15 @@ PoseAnimator.prototype._loop = function() {
 
     self._advanceMoveState(dt);
 
+    // Feet are always free-hanging — recompute each frame from current wrist positions
+    // so they follow the body up the wall naturally instead of freezing between moves.
+    var lAnkle = self._naturalFoot('left');
+    var rAnkle = self._naturalFoot('right');
+
     // Compute full joint set from current contact points
     var joints = self._stableJoints(
       self._lWrist, self._rWrist,
-      self._lAnkle, self._rAnkle,
+      lAnkle, rAnkle,
     );
     self._draw(joints);
 

@@ -376,20 +376,38 @@ function _pickSuggestion(s) {
 
 // ── Auto-Generate ─────────────────────────────────────────────────────────────
 
+var _selectedAutoGrade = '';  // '' = freeform, 'V6' etc = specific grade
+
+function selectAutoGrade(el, grade) {
+  _selectedAutoGrade = grade;
+  document.querySelectorAll('.grade-chip').forEach(function(c) { c.classList.remove('active'); });
+  el.classList.add('active');
+  // Show/hide freeform slider
+  var row = document.getElementById('auto-difficulty-row');
+  if (row) row.style.display = grade ? 'none' : 'flex';
+}
+
 async function autoGenerate() {
-  var diffSlider = document.getElementById('auto-difficulty');
+  var diffSlider  = document.getElementById('auto-difficulty');
   var countSlider = document.getElementById('auto-hold-count');
-  var difficulty = diffSlider  ? parseFloat(diffSlider.value)  : 0.4;
-  var holdCount  = countSlider ? parseInt(countSlider.value)    : 8;
+  var difficulty  = diffSlider  ? parseFloat(diffSlider.value) : 0.4;
+  var holdCount   = countSlider ? parseInt(countSlider.value)   : 8;
 
   var btn = document.getElementById('btn-auto-generate');
   if (btn) { btn.textContent = 'Generating…'; btn.disabled = true; }
+
+  var reqBody = { angle: creatorAngle, hold_count: holdCount };
+  if (_selectedAutoGrade) {
+    reqBody.grade = _selectedAutoGrade;
+  } else {
+    reqBody.difficulty = difficulty;
+  }
 
   try {
     var res = await fetch(API + '/api/auto_generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ angle: creatorAngle, difficulty: difficulty, hold_count: holdCount }),
+      body: JSON.stringify(reqBody),
     });
     var data = await res.json();
     if (data.error) { showToast('Auto-generate failed: ' + data.error, 'error'); return; }
@@ -401,7 +419,8 @@ async function autoGenerate() {
     refreshCreatorBoard();
     updatePathfinderStatus();
     triggerPredict();
-    showToast('Generated ' + creatorHolds.length + ' hold route!', 'success');
+    var gradeLabel = _selectedAutoGrade ? ' · targeting ' + _selectedAutoGrade : '';
+    showToast('Generated ' + creatorHolds.length + ' hold route' + gradeLabel + '!', 'success');
   } catch(e) {
     showToast('API offline — cannot auto-generate.', 'error');
   } finally {
@@ -426,15 +445,22 @@ async function runPredict() {
   }
 
   try {
+    // Include climber profile if set — enables personal difficulty score
+    var reqBody = {
+      holds: creatorHolds.map(function(h) {
+        return { x_cm: h.x_cm, y_cm: h.y_cm, role: h.role, hold_type: h.hold_type, hand_sequence: h.hand_sequence };
+      }),
+      angle: creatorAngle,
+    };
+    var savedClimberId = localStorage.getItem('climberId');
+    if (savedClimberId) reqBody.climber_id = savedClimberId;
+    var savedProfile = _getProfileForPDScore();
+    if (savedProfile) reqBody.profile = savedProfile;
+
     var res = await fetch(API + '/api/predict', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        holds: creatorHolds.map(function(h, i) {
-          return { x_cm: h.x_cm, y_cm: h.y_cm, role: h.role, hold_type: h.hold_type, hand_sequence: h.hand_sequence };
-        }),
-        angle: creatorAngle,
-      }),
+      body: JSON.stringify(reqBody),
     });
     var data = await res.json();
     if (data.error) return;
@@ -449,12 +475,45 @@ async function runPredict() {
       : confPct + '% conf';
     document.getElementById('grade-bar-fill').style.width = (data.score * 100).toFixed(1) + '%';
 
+    // Personal difficulty score (1.0–10.0 scale) — only shown when profile has body dims
+    var pdEl = document.getElementById('pred-pd-grade');
+    if (pdEl) {
+      if (data.pd_personal != null) {
+        pdEl.style.display = '';
+        var pdInner = document.getElementById('pred-pd-grade-val');
+        if (pdInner) {
+          pdInner.textContent = data.pd_personal.toFixed(1);
+          // Colour: green <4, yellow 4–7, coral >7
+          pdInner.style.color = data.pd_personal < 4 ? 'var(--teal)' :
+                                 data.pd_personal < 7 ? '#f59e0b' : 'var(--coral)';
+        }
+      } else {
+        pdEl.style.display = 'none';
+      }
+    }
+
     var dna = data.dna || {};
     ['reach','sustained','dynamic','lateral','complexity','power'].forEach(function(k) {
       document.getElementById('dna-' + k).style.width = (dna[k] || 0) + '%';
       document.getElementById('dna-' + k + '-v').textContent = dna[k] || 0;
     });
   } catch(e) { /* API down — fail silently */ }
+}
+
+// Read profile from localStorage and convert to metric for PDScore.
+// Returns null if height/wingspan not set (PDScore won't be computed).
+function _getProfileForPDScore() {
+  try {
+    var p = JSON.parse(localStorage.getItem('climberProfile') || '{}');
+    if (!p.height || !p.wingspan) return null;
+    var h  = p.height,   ws = p.wingspan, wt = p.weight;
+    if (p.units === 'imperial') {
+      h  = h  ? h  * 2.54      : null;
+      ws = ws ? ws * 2.54      : null;
+      wt = wt ? wt * 0.453592  : null;
+    }
+    return { height_cm: h, wingspan_cm: ws, weight_kg: wt || null };
+  } catch(e) { return null; }
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
@@ -469,6 +528,8 @@ function clearCreator() {
   document.getElementById('pred-grade').textContent = '—';
   document.getElementById('pred-conf').textContent  = '';
   document.getElementById('grade-bar-fill').style.width = '0%';
+  var pdEl = document.getElementById('pred-pd-grade');
+  if (pdEl) pdEl.style.display = 'none';
   ['reach','sustained','dynamic','lateral','complexity','power'].forEach(function(k) {
     document.getElementById('dna-' + k).style.width = '0%';
     document.getElementById('dna-' + k + '-v').textContent = '0';
