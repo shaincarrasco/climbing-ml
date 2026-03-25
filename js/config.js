@@ -11,6 +11,37 @@ var API = (function () {
   return 'http://localhost:5001';
 })();
 
+// ── Supabase client ───────────────────────────────────────────────────────────
+// Initialised asynchronously from /api/config so credentials never sit in JS.
+// SUPABASE_CLIENT resolves to the client once ready; use _withSupabase(cb) for
+// anything that needs it at startup.
+var SUPABASE_CLIENT = null;
+var _supabaseReady  = false;
+var _supabaseCbs    = [];
+
+(async function _initSupabase() {
+  try {
+    var res  = await fetch(API + '/api/config');
+    var cfg  = await res.json();
+    if (cfg.supabase_url && cfg.supabase_key && typeof supabase !== 'undefined') {
+      SUPABASE_CLIENT = supabase.createClient(cfg.supabase_url, cfg.supabase_key);
+    }
+  } catch(e) {
+    // API offline or Supabase not configured — client stays null, app still works
+  } finally {
+    _supabaseReady = true;
+    _supabaseCbs.forEach(function(cb) { try { cb(SUPABASE_CLIENT); } catch(e) {} });
+    _supabaseCbs = [];
+  }
+})();
+
+// Call cb(supabaseClient) once the client is initialised (or immediately if ready).
+// cb receives null if Supabase is not configured.
+function _withSupabase(cb) {
+  if (_supabaseReady) { cb(SUPABASE_CLIENT); return; }
+  _supabaseCbs.push(cb);
+}
+
 var POSE_FRAME_MS = 110; // ~9 fps playback
 
 function gradeColor(grade) {

@@ -1,9 +1,22 @@
 from flask import Blueprint, jsonify
 
 from api.board_config import get_board_holds
-from api.db import get_pg
+from api.db import get_pg, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY
 
 bp = Blueprint("stats", __name__)
+
+
+@bp.route("/api/config")
+def frontend_config():
+    """
+    Public config endpoint — returns Supabase URL and publishable key so the
+    frontend can initialise the Supabase JS client without hardcoding values.
+    Only publishable (non-secret) credentials are exposed here.
+    """
+    return jsonify({
+        "supabase_url":  SUPABASE_URL,
+        "supabase_key":  SUPABASE_PUBLISHABLE_KEY,
+    })
 
 
 @bp.route("/api/stats")

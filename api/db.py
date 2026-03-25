@@ -30,6 +30,10 @@ MODEL_DIR   = PROJECT_ROOT / "ml"
 DATA_DIR    = PROJECT_ROOT / "data"
 SQLITE_PATH = Path(os.getenv("KILTER_DB_PATH", str(PROJECT_ROOT / "kilter.db"))).expanduser()
 
+# Supabase project config (used by frontend via /api/config and by auth helpers)
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
+
 # ── PostgreSQL connection pool ────────────────────────────────────────────────
 
 _pool: pg_pool.ThreadedConnectionPool | None = None
