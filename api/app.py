@@ -57,14 +57,17 @@ from api.blueprints.predict import bp as predict_bp
 from api.blueprints.stats   import bp as stats_bp
 from api.blueprints.climber import bp as climber_bp
 from api.blueprints.gym     import bp as gym_bp
-from api.blueprints.pose    import bp as pose_bp
+from api.blueprints.pose      import bp as pose_bp
+from api.blueprints.waitlist  import bp as waitlist_bp
+from api.blueprints.telemetry import bp as telemetry_bp
+from api.blueprints.auth      import bp as auth_bp
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
     CORS(app)
 
-    for bp in (board_bp, routes_bp, predict_bp, stats_bp, climber_bp, gym_bp, pose_bp):
+    for bp in (board_bp, routes_bp, predict_bp, stats_bp, climber_bp, gym_bp, pose_bp, waitlist_bp, telemetry_bp, auth_bp):
         app.register_blueprint(bp)
 
     @app.route("/")
@@ -72,8 +75,8 @@ def create_app() -> Flask:
         return jsonify({"status": "ok", "version": "2.0", "endpoints": [
             "/api/board", "/api/boards",
             "/api/routes", "/api/route/<id>",
-            "/api/predict", "/api/suggest", "/api/auto_generate",
-            "/api/stats",
+            "/api/predict", "/api/suggest", "/api/auto_generate", "/api/routes/similar",
+            "/api/stats", "/api/daily_challenge", "/api/daily_challenge/generate",
             "/api/climber/benchmarks", "/api/climber/recommendations", "/api/climber/weak-points",
             "/api/gym/dashboard", "/api/gym/setting-recommendations", "/api/gym/route-performance",
             "/api/pose/stats", "/api/pose/correlations",
@@ -99,7 +102,7 @@ if __name__ == "__main__":
     print("\nClimbing Intelligence API")
     print("  Warming board hold cache…")
     get_board_holds()
-    print("  Loading ML model…")
+    print("  Loading ML model (point + q10 + q90)…")
     get_model()
     print(f"  Listening on http://localhost:{args.port}\n")
 

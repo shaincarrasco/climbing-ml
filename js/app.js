@@ -18,13 +18,18 @@ function showToast(msg, type) {
 // ── Tab Switching ─────────────────────────────────────────────────────────────
 
 function switchTab(tab) {
+  if (window.telem) window.telem.track('tab_switch', { tab: tab });
   document.querySelectorAll('[data-tab-view]').forEach(function(v) { v.classList.remove('active'); });
   document.querySelectorAll('.nav-tab').forEach(function(t) { t.classList.remove('active'); });
 
   var view = document.querySelector('[data-tab-view="' + tab + '"]');
   if (view) view.classList.add('active');
   document.querySelectorAll('.nav-tab').forEach(function(t) {
-    if (t.textContent.toLowerCase() === tab) t.classList.add('active');
+    var tabName = t.textContent.trim().toLowerCase();
+    // 'create' button maps to 'creator' tab
+    if (tabName === tab || (tabName === 'create' && tab === 'creator')) {
+      t.classList.add('active');
+    }
   });
 
   if (tab === 'explore' && boardLoaded) {
@@ -60,8 +65,12 @@ async function loadStats() {
   try {
     var res  = await fetch(API + '/api/stats');
     var data = await res.json();
+    var total   = data.total_routes  || 0;
+    var graded  = data.graded_routes || 0;
+    var acc     = data.model_accuracy || data.grade_within1_acc;
+    var accuracy = acc ? ' · <b>' + (typeof acc === 'number' ? (acc * 100).toFixed(0) + '% acc' : acc) + '</b>' : '';
     document.getElementById('nav-stats').innerHTML =
-      '<b>' + data.total_routes.toLocaleString() + '</b> routes · <b>' + data.model_accuracy + '</b>';
+      '<b>' + total.toLocaleString() + '</b> routes · <b>' + graded.toLocaleString() + '</b> graded' + accuracy;
   } catch(e) {
     document.getElementById('nav-stats').textContent = 'API offline';
   }
@@ -86,6 +95,7 @@ window.addEventListener('resize', function() {
     loadRoutes(true),
     loadStats(),
   ]);
+  if (typeof initDailyChallenge === 'function') initDailyChallenge();
 })();
 
 window.addEventListener('DOMContentLoaded', function() {

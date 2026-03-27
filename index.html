@@ -2,21 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kilter AI">
+<meta name="theme-color" content="#060A0D">
 <title>Kilter Intelligence</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
 <!-- ── NAV ── -->
 <nav>
-  <div class="nav-logo">KILTER<span>·</span>INTELLIGENCE</div>
+  <div class="nav-logo">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="display:inline;vertical-align:-1px;margin-right:6px;opacity:0.9;">
+      <polygon points="6,1 11,10 1,10" fill="none" stroke="url(#ngl)" stroke-width="1.4" stroke-linejoin="round"/>
+      <defs><linearGradient id="ngl" x1="1" y1="10" x2="11" y2="1" gradientUnits="userSpaceOnUse"><stop stop-color="#00E5C8"/><stop offset="1" stop-color="#9B6DFF"/></linearGradient></defs>
+    </svg>KILTER<span> / </span>INTELLIGENCE
+  </div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="switchTab('explore')">Explore</button>
-    <button class="nav-tab" onclick="switchTab('creator')">Creator</button>
+    <button class="nav-tab" onclick="switchTab('creator')">Create</button>
     <button class="nav-tab" onclick="switchTab('profile')">Profile</button>
   </div>
-  <div style="display:flex;align-items:center;gap:12px;">
+  <div style="display:flex;align-items:center;gap:10px;">
     <div class="nav-stats" id="nav-stats">Loading…</div>
     <button class="nav-profile-btn" id="nav-profile-btn" onclick="switchTab('profile')" title="Your profile">
       <span id="nav-profile-label">Set up profile</span>
@@ -33,7 +46,10 @@
     <!-- Left: route list -->
     <div class="left-panel">
       <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;">
-        <span class="panel-title">Routes</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span class="panel-title">Routes</span>
+          <button id="setters-toggle-btn" onclick="toggleSettersView()" style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;padding:2px 8px;border-radius:10px;border:1px solid var(--border);background:none;color:var(--mist);cursor:pointer;">Setters</button>
+        </div>
         <span id="route-count" style="font-size:10px;color:var(--mist);font-family:'Space Mono',monospace;"></span>
       </div>
       <div class="search-box">
@@ -48,12 +64,29 @@
         <button class="filter-chip" onclick="filterGrade(this,'V10')">V10</button>
         <button class="filter-chip" id="beta-filter-btn" onclick="toggleBetaFilter(this)" title="Show only routes with beta video data">BETA</button>
       </div>
+      <!-- Hold type filters -->
+      <div class="filter-row" id="hold-type-filters" style="border-bottom:1px solid var(--border);padding-bottom:6px;">
+        <span style="font-size:9px;color:var(--mist);letter-spacing:0.08em;font-family:'Space Mono',monospace;margin-right:2px;">HOLDS</span>
+        <button class="filter-chip" id="ht-crimp"  onclick="toggleHoldTypeFilter('crimp')"  title="Crimp-heavy routes" style="border-color:rgba(76,168,255,0.3);">Crimp</button>
+        <button class="filter-chip" id="ht-jug"    onclick="toggleHoldTypeFilter('jug')"    title="Jug-heavy routes"   style="border-color:rgba(0,229,200,0.3);">Jug</button>
+        <button class="filter-chip" id="ht-sloper" onclick="toggleHoldTypeFilter('sloper')" title="Sloper routes"       style="border-color:rgba(192,132,252,0.3);">Sloper</button>
+        <button class="filter-chip" id="ht-pinch"  onclick="toggleHoldTypeFilter('pinch')"  title="Pinch routes"        style="border-color:rgba(245,176,0,0.3);">Pinch</button>
+        <button class="filter-chip" id="sort-sends" onclick="toggleSortSends(this)" title="Sort by most popular">↓ Sends</button>
+      </div>
+      <!-- Daily Challenge Banner -->
+      <div id="daily-challenge-banner" style="display:none;margin:0 0 8px;padding:10px 12px;background:linear-gradient(135deg,rgba(0,229,200,0.08),rgba(139,92,246,0.08));border:1px solid rgba(0,229,200,0.25);border-radius:8px;cursor:pointer;" onclick="loadDailyChallenge()">
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:0.1em;color:var(--teal);font-weight:700;font-family:'Space Mono',monospace;">Today's Challenge</div>
+        <div id="daily-challenge-text" style="font-size:12px;margin-top:3px;color:var(--fg);">Loading…</div>
+        <div style="font-size:9px;color:var(--mist);margin-top:2px;">Tap to load on board</div>
+      </div>
+
       <div class="panel-scroll" id="route-list">
         <div class="loading-overlay" style="position:relative;height:200px;">
           <div class="spinner"></div>
           <span class="loading-text">Loading routes…</span>
         </div>
       </div>
+      <div class="panel-scroll" id="setters-list" style="display:none;"></div>
     </div>
 
     <!-- Center: board -->
@@ -116,8 +149,8 @@
       <div class="panel-header"><span class="panel-title">Route Detail</span></div>
       <div class="panel-scroll" id="route-detail">
         <div class="empty-state">
-          <div class="big">→</div>
-          Select a route to see its holds and stats
+          <div class="big">◈</div>
+          Select a route from the list
         </div>
       </div>
 
@@ -147,6 +180,22 @@
         <button class="play-btn" id="pose-play-btn" onclick="togglePosePlay()" disabled>▶ Play Beta</button>
         <div class="frame-counter" id="pose-frame-counter"></div>
         <div class="kbd-hint" id="kbd-hint" style="display:none;">SPACE play/pause · ← → step frames</div>
+
+        <!-- Physics Mode toggle -->
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 2px;">
+          <button
+            id="physics-mode-btn"
+            class="play-btn"
+            style="background:rgba(139,92,246,0.18);border:1px solid rgba(139,92,246,0.45);color:#a78bfa;font-size:10px;padding:5px 0;margin:0;width:100%;"
+            onclick="togglePhysicsMode()"
+            disabled
+            title="Switch between IK stick figure and Matter.js ragdoll physics">
+            ⚛ Physics Mode
+          </button>
+        </div>
+        <div id="physics-mode-label" style="display:none;font-size:9px;color:rgba(167,139,250,0.75);text-align:center;padding:0 8px 4px;font-family:'Space Mono',monospace;letter-spacing:0.04em;">
+          MATTER.JS RAGDOLL ACTIVE
+        </div>
       </div>
     </div>
 
@@ -178,7 +227,7 @@
         <div class="hc-chip">Start <b id="ct-start">0</b></div>
         <div class="hc-chip">Hand <b id="ct-hand">0</b></div>
         <div class="hc-chip">Foot <b id="ct-foot">0</b></div>
-        <div class="hc-chip">Finish <b id="ct-finish">0</b>/1</div>
+        <div class="hc-chip">Finish <b id="ct-finish">0</b>/2</div>
       </div>
 
       <!-- Grade meter -->
@@ -186,7 +235,9 @@
         <div class="creator-label">Predicted Grade</div>
         <div class="grade-display">
           <div class="grade-big" id="pred-grade">—</div>
+          <div id="pred-grade-band" style="display:none;font-size:11px;color:var(--mist);margin-top:2px;letter-spacing:0.03em;"></div>
           <div class="grade-conf" id="pred-conf"></div>
+          <div id="pred-style-tags" style="display:none;margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;"></div>
         </div>
         <div class="grade-bar-track">
           <div class="grade-bar-fill" id="grade-bar-fill"></div>
@@ -203,6 +254,17 @@
           </div>
         </div>
       </div>
+
+      <!-- Weight adjustment -->
+      <div id="pred-weight-adj" style="display:none;margin-top:6px;padding:6px 10px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:var(--mist);">Weight-adjusted</span>
+          <span id="pred-weight-adj-val" style="font-size:14px;font-weight:700;font-family:var(--mono);color:var(--amber);">—</span>
+        </div>
+      </div>
+
+      <!-- SHAP explanation -->
+      <div id="pred-explanation" style="display:none;margin-top:10px;padding:8px 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;"></div>
 
       <!-- DNA bars -->
       <div class="dna-section">
@@ -250,7 +312,24 @@
       <div class="creator-actions">
         <button class="btn btn-primary" onclick="saveDraftRoute()">Save Route</button>
         <button class="btn btn-ghost"   onclick="toggleSuggestions()">Suggest Holds</button>
+        <button class="btn btn-ghost"   onclick="exportRouteText()" title="Export hold list as text for physical setting">Export</button>
         <button class="btn btn-danger"  onclick="clearCreator()">Clear</button>
+      </div>
+
+      <!-- Circuit Builder -->
+      <div class="creator-section" style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px;">
+        <div class="creator-label">Circuit Builder
+          <span style="font-size:9px;color:var(--mist);font-weight:400;margin-left:6px;">save route sets as a training circuit</span>
+        </div>
+        <div id="circuit-build-list" style="margin:6px 0;max-height:120px;overflow-y:auto;"></div>
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <input id="circuit-add-grade" placeholder="Grade" style="width:64px;padding:5px 7px;font-size:11px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--chalk);">
+          <button onclick="addCurrentToCircuit()" style="flex:1;padding:5px 10px;background:rgba(0,229,200,0.1);border:1px solid rgba(0,229,200,0.25);border-radius:6px;color:var(--teal);font-size:11px;font-weight:600;cursor:pointer;">+ Add Current Route</button>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <input id="circuit-name-input" placeholder="Circuit name…" style="flex:1;padding:6px 9px;font-size:11px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--chalk);">
+          <button onclick="saveCurrentCircuit()" style="padding:6px 12px;background:var(--teal);border:none;border-radius:6px;color:#060A0D;font-size:11px;font-weight:700;cursor:pointer;">Save</button>
+        </div>
       </div>
 
       <!-- Start position preview -->
@@ -327,26 +406,42 @@
     <div class="body-analytics">
 
       <!-- Hero stats -->
-      <div class="profile-hero" id="profile-hero">
-        <div class="hero-stat">
-          <div class="big-num green" id="hero-exact-match">—</div>
-          <div class="hero-lbl">V-Grade Match</div>
-          <div class="hero-sub">exact matches</div>
+      <div class="profile-hero" id="profile-hero" style="flex-direction:column;gap:0;">
+        <!-- Name greeting row -->
+        <div style="display:flex;align-items:center;gap:14px;padding:20px 24px 8px;border-bottom:1px solid var(--border);">
+          <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--teal),var(--purple));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0;" id="hero-avatar">?</div>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input id="hero-name-input" placeholder="Your name" maxlength="32"
+                style="background:none;border:none;border-bottom:1px solid var(--border2);color:var(--chalk);font-size:18px;font-weight:700;font-family:'Syne',sans-serif;width:180px;padding:2px 0;outline:none;"
+                oninput="saveClimberName()" />
+              <span style="font-size:11px;color:var(--mist);">climber</span>
+            </div>
+            <div style="font-size:11px;color:var(--mist);margin-top:3px;" id="hero-tagline">Set your name above to get started</div>
+          </div>
         </div>
-        <div class="hero-stat">
-          <div class="big-num" id="hero-mae-vgrade">—</div>
-          <div class="hero-lbl">Avg Error</div>
-          <div class="hero-sub">V-grades off</div>
-        </div>
-        <div class="hero-stat">
-          <div class="big-num amber" id="hero-routes">—</div>
-          <div class="hero-lbl">Routes</div>
-          <div class="hero-sub">with pose data</div>
-        </div>
-        <div class="hero-stat">
-          <div class="big-num purple" id="hero-frames">—</div>
-          <div class="hero-lbl">Pose Frames</div>
-          <div class="hero-sub">total extracted</div>
+        <!-- Stats row -->
+        <div style="display:flex;flex:1;gap:0;">
+          <div class="hero-stat">
+            <div class="big-num green" id="hero-total-sends">0</div>
+            <div class="hero-lbl">Lifetime Sends</div>
+            <div class="hero-sub">logged routes</div>
+          </div>
+          <div class="hero-stat">
+            <div class="big-num amber" id="hero-sessions">0</div>
+            <div class="hero-lbl">Sessions</div>
+            <div class="hero-sub">training days</div>
+          </div>
+          <div class="hero-stat">
+            <div class="big-num purple" id="hero-best-grade">—</div>
+            <div class="hero-lbl">Best Send</div>
+            <div class="hero-sub">hardest grade</div>
+          </div>
+          <div class="hero-stat">
+            <div class="big-num" id="hero-streak">0</div>
+            <div class="hero-lbl">Day Streak</div>
+            <div class="hero-sub">consecutive days</div>
+          </div>
         </div>
       </div>
 
@@ -433,35 +528,27 @@
         </div>
 
         <div class="ba-stats-col">
-          <div class="ba-title">Body Analytics</div>
+          <div class="ba-title">Your Body Metrics</div>
           <div class="ba-subtitle">
-            Run <code style="font-family:'Space Mono',monospace;font-size:10px;color:var(--teal);">pipeline/pose_extractor.py</code>
-            on climbing videos to populate body metrics. The model extracts 17 joints at ~10 fps
-            and stores hip angles, arm reach, COM height, and tension score per frame.
+            These stats are pulled from your climbing videos. The AI tracks 17 body joints
+            to measure tension, hip angle, reach, and center-of-mass across every move.
           </div>
 
           <div class="ba-stat-grid" id="profile-stats-grid">
-            <div class="ba-stat-box"><div class="val" id="ps-total-frames">0</div><div class="lbl">Total Frames</div></div>
-            <div class="ba-stat-box"><div class="val" id="ps-total-attempts">0</div><div class="lbl">Attempts Tagged</div></div>
-            <div class="ba-stat-box"><div class="val" id="ps-avg-tension">—</div><div class="lbl">Avg Tension</div></div>
-            <div class="ba-stat-box"><div class="val" id="ps-avg-hip">—</div><div class="lbl">Avg Hip Angle</div></div>
-            <div class="ba-stat-box"><div class="val" id="ps-avg-reach">—</div><div class="lbl">Avg Arm Reach</div></div>
-            <div class="ba-stat-box"><div class="val" id="ps-avg-com">—</div><div class="lbl">Avg COM Height</div></div>
+            <div class="ba-stat-box"><div class="val" id="ps-total-frames">0</div><div class="lbl">Frames Analyzed</div></div>
+            <div class="ba-stat-box"><div class="val" id="ps-total-attempts">0</div><div class="lbl">Attempts</div></div>
+            <div class="ba-stat-box"><div class="val" id="ps-avg-tension">—</div><div class="lbl">Body Tension</div></div>
+            <div class="ba-stat-box"><div class="val" id="ps-avg-hip">—</div><div class="lbl">Hip Angle</div></div>
+            <div class="ba-stat-box"><div class="val" id="ps-avg-reach">—</div><div class="lbl">Arm Reach</div></div>
+            <div class="ba-stat-box"><div class="val" id="ps-avg-com">—</div><div class="lbl">COM Height</div></div>
           </div>
 
-          <!-- Quick commands -->
-          <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">
-            <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;color:var(--mist);margin-bottom:8px;">QUICK COMMANDS</div>
-            <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--chalk);line-height:2.2;">
-              <div><span style="color:var(--mist);"># Single video</span></div>
-              <div>python3 pipeline/pose_extractor.py \</div>
-              <div>&nbsp;&nbsp;--video clip.mp4 --attempt-id &lt;uuid&gt;</div>
-              <div style="margin-top:4px;"><span style="color:var(--mist);"># Batch directory</span></div>
-              <div>python3 pipeline/pose_extractor.py \</div>
-              <div>&nbsp;&nbsp;--video-dir ./videos/ --sample-fps 10</div>
-              <div style="margin-top:4px;"><span style="color:var(--mist);"># Retrain model</span></div>
-              <div>python3 ml/pose_difficulty_model.py</div>
-            </div>
+          <!-- Coming soon: video upload -->
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center;">
+            <div style="font-size:22px;margin-bottom:8px;">🎥</div>
+            <div style="font-size:12px;font-weight:600;color:var(--chalk);margin-bottom:4px;">Upload a Climbing Video</div>
+            <div style="font-size:11px;color:var(--mist);margin-bottom:12px;">AI will analyze your body position and show technique gaps vs your target grade.</div>
+            <button style="padding:8px 20px;background:linear-gradient(135deg,var(--teal),var(--purple));border:none;border-radius:20px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;opacity:0.7;" disabled>Coming Soon — Pro Feature</button>
           </div>
         </div>
       </div>
@@ -488,6 +575,71 @@
         </div>
       </div>
 
+      <!-- ── Session Logger ──────────────────────────────────────────── -->
+      <div class="ba-row" style="flex:none;padding:20px 24px;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="ba-title">Training Sessions</div>
+          <div id="session-elapsed" style="font-family:'Space Mono',monospace;font-size:11px;color:var(--teal);display:none;"></div>
+        </div>
+
+        <!-- Start session area (shown when no active session) -->
+        <div id="start-session-area">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+            <label style="font-size:11px;color:var(--mist);">Angle</label>
+            <select id="session-angle" style="padding:5px 8px;font-size:11px;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--chalk);">
+              <option>0</option><option>20</option><option>35</option><option selected>40</option>
+              <option>45</option><option>50</option><option>55</option><option>60</option><option>65</option><option>70</option>
+            </select>
+          </div>
+          <button onclick="startNewSession()" style="width:100%;padding:10px;background:var(--teal);color:#060A0D;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:0.04em;">▶ Start Session</button>
+        </div>
+
+        <!-- Active session panel (shown when session in progress) -->
+        <div id="active-session-panel" style="display:none;">
+          <div style="background:rgba(0,229,200,0.06);border:1px solid rgba(0,229,200,0.2);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div>
+                <div style="font-size:10px;color:var(--teal);font-weight:700;letter-spacing:0.08em;">SESSION IN PROGRESS</div>
+                <div style="font-size:11px;color:var(--mist);margin-top:2px;" id="session-header-date">—</div>
+              </div>
+              <div style="font-size:12px;color:var(--mist);" id="session-header-angle">—</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
+              <div style="text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--green);" id="session-sends-count">0</div><div style="font-size:9px;color:var(--mist);">Sends</div></div>
+              <div style="text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--chalk);" id="session-routes-count">0</div><div style="font-size:9px;color:var(--mist);">Routes</div></div>
+              <div style="text-align:center;"><div style="font-size:14px;font-weight:700;color:var(--amber);" id="session-grade-range">—</div><div style="font-size:9px;color:var(--mist);">Grades</div></div>
+            </div>
+            <div id="session-route-list" style="max-height:140px;overflow-y:auto;"></div>
+            <textarea id="session-notes-input" placeholder="Session notes…" rows="2"
+              style="width:100%;margin-top:8px;padding:7px 9px;font-size:11px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--chalk);resize:vertical;font-family:var(--sans);"></textarea>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button onclick="openLogRouteModal()" style="flex:2;padding:8px;background:rgba(0,229,200,0.12);border:1px solid rgba(0,229,200,0.3);border-radius:7px;color:var(--teal);font-size:11px;font-weight:600;cursor:pointer;">+ Log Route</button>
+            <button onclick="endCurrentSession()" style="flex:2;padding:8px;background:var(--teal);border:none;border-radius:7px;color:#060A0D;font-size:11px;font-weight:700;cursor:pointer;">■ End Session</button>
+            <button onclick="discardSession()" style="flex:1;padding:8px;background:none;border:1px solid var(--border);border-radius:7px;color:var(--mist);font-size:11px;cursor:pointer;">×</button>
+          </div>
+        </div>
+
+        <!-- History -->
+        <div id="session-history"></div>
+      </div>
+
+      <!-- ── Saved Routes ──────────────────────────────────────────────── -->
+      <div class="ba-row" style="flex:none;padding:20px 24px;flex-direction:column;gap:10px;">
+        <div class="ba-title">Saved Routes</div>
+        <div id="saved-routes-list">
+          <div style="font-size:11px;color:var(--mist);">No saved routes yet. Press ☆ on any route to save it.</div>
+        </div>
+      </div>
+
+      <!-- ── Circuits ──────────────────────────────────────────────────── -->
+      <div class="ba-row" style="flex:none;padding:20px 24px;flex-direction:column;gap:10px;">
+        <div class="ba-title">Circuits <span style="font-size:9px;color:var(--mist);font-weight:400;margin-left:6px;">saved training sets</span></div>
+        <div id="circuits-list">
+          <div style="font-size:11px;color:var(--mist);">No circuits saved. Build one in the Create tab.</div>
+        </div>
+      </div>
+
       <!-- ── Video Coach ──────────────────────────────────────────────── -->
       <div class="ba-row" style="flex:none;padding:20px 24px;flex-direction:column;gap:14px;">
         <div class="ba-title">Video Coach
@@ -503,9 +655,11 @@
           ondragover="event.preventDefault();this.style.borderColor='var(--teal)'"
           ondragleave="this.style.borderColor='var(--border)'"
           ondrop="handleCoachDrop(event)">
-          <div style="font-size:24px;margin-bottom:8px;">🎥</div>
-          <div style="font-size:12px;color:var(--chalk);">Drop your climbing video here</div>
-          <div style="font-size:10px;color:var(--mist);margin-top:4px;">mp4 / mov / avi · max 200MB</div>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:8px;opacity:0.4;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M12 18.75H4.5a2.25 2.25 0 01-2.25-2.25V9m12.841 9.091L16.5 19.5m-1.409-1.409c.407-.407.659-.97.659-1.591v-9a2.25 2.25 0 00-2.25-2.25h-9c-.621 0-1.184.252-1.591.659m12.182 12.182L2.909 5.909M1.5 4.5l1.409 1.409"/>
+          </svg>
+          <div style="font-size:12px;color:var(--chalk);font-weight:500;">Drop your climbing video here</div>
+          <div style="font-size:10px;color:var(--mist);margin-top:4px;">mp4 · mov · avi &nbsp;·&nbsp; max 200MB</div>
           <input type="file" id="coach-file-input" accept="video/*" style="display:none"
             onchange="uploadCoachVideo(this.files[0])">
         </div>
@@ -533,6 +687,23 @@
 
         <!-- Upload progress / results -->
         <div id="coach-status" style="display:none;"></div>
+      </div>
+
+      <!-- ── Community Activity Feed ──────────────────────────────────── -->
+      <div class="ba-row" style="flex:none;flex-direction:column;gap:0;">
+        <div style="padding:20px 24px 12px;display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="ba-title">Community</div>
+            <div style="font-size:11px;color:var(--mist);margin-top:2px;">Recent sends on Kilter · powered by AI grading</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span id="community-live-dot" style="width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);display:inline-block;animation:suggest-pulse 2s infinite;"></span>
+            <span style="font-size:9px;color:var(--green);font-family:'Space Mono',monospace;font-weight:700;letter-spacing:0.08em;">LIVE</span>
+          </div>
+        </div>
+        <div class="community-feed" style="padding-top:0;" id="community-feed-list">
+          <div style="font-size:11px;color:var(--mist);padding:8px 0;">Loading community activity…</div>
+        </div>
       </div>
 
     </div>
@@ -580,16 +751,62 @@
 <!-- Supabase JS client (loaded before config so SUPABASE global is available) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+<!-- Matter.js physics engine -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+
 <!-- Scripts (order matters — each file uses globals from earlier ones) -->
 <script src="js/config.js"></script>
+<script src="js/telemetry.js"></script>
 <script src="js/stick-figure.js"></script>
 <script src="js/pose-animator.js"></script>
+<script src="js/physics-animator.js"></script>
 <script src="js/board.js"></script>
 <script src="js/explore.js"></script>
 <script src="js/pose-player.js"></script>
 <script src="js/creator.js"></script>
 <script src="js/profile.js"></script>
+<script src="js/session.js"></script>
 <script src="js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+</script>
 
+<!-- ── Log Route Modal ──────────────────────────────────────────────────── -->
+<div id="log-route-modal" style="display:none;position:fixed;inset:0;z-index:2000;align-items:center;justify-content:center;background:rgba(6,10,13,0.8);backdrop-filter:blur(6px);">
+  <div style="background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:22px 24px;width:320px;max-width:90vw;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;color:var(--chalk);">Log Route</div>
+      <button onclick="closeLogRouteModal()" style="background:none;border:none;color:var(--mist);font-size:18px;cursor:pointer;padding:0 4px;">×</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <label style="font-size:10px;color:var(--mist);display:block;margin-bottom:4px;">Route Name</label>
+        <input id="log-route-name" type="text" placeholder="Route name" style="width:100%;padding:7px 10px;font-size:12px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--chalk);">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <label style="font-size:10px;color:var(--mist);display:block;margin-bottom:4px;">Grade</label>
+          <select id="log-route-grade" style="width:100%;padding:7px 8px;font-size:12px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--chalk);">
+            <option value="">—</option>
+            <option>V0</option><option>V1</option><option>V2</option><option>V3</option>
+            <option>V4</option><option>V5</option><option>V6</option><option>V7</option>
+            <option>V8</option><option>V9</option><option>V10</option><option>V11</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--mist);display:block;margin-bottom:4px;">Attempts</label>
+          <input id="log-route-att" type="number" min="1" max="99" value="1" style="width:100%;padding:7px 10px;font-size:12px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--chalk);">
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 10px;background:rgba(30,224,122,0.06);border:1px solid rgba(30,224,122,0.15);border-radius:7px;">
+        <input id="log-route-sent" type="checkbox" style="width:16px;height:16px;accent-color:var(--green);">
+        <span style="font-size:12px;font-weight:600;color:var(--green);">✓ Sent it!</span>
+      </label>
+      <button onclick="submitLogRoute()" style="width:100%;padding:10px;background:var(--teal);border:none;border-radius:8px;color:#060A0D;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:0.04em;margin-top:4px;">Log Route</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

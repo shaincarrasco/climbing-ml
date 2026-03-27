@@ -1,8 +1,9 @@
 {
-  "n_train": 39948,
-  "n_val": 8533,
-  "n_test": 8556,
-  "n_features": 85,
+  "trained_at": "2026-03-27T16:04:56Z",
+  "n_train": 3468,
+  "n_val": 632,
+  "n_test": 633,
+  "n_features": 72,
   "feature_cols": [
     "board_angle_deg",
     "hand_hold_count",
@@ -53,29 +54,18 @@
     "total_centroid_y_cm",
     "hold_spread_x",
     "hold_spread_y",
-    "crimp_ratio",
-    "sloper_ratio",
-    "jug_ratio",
-    "pinch_ratio",
-    "typed_ratio",
-    "pose_avg_hip_angle",
-    "pose_min_hip_angle",
-    "pose_hip_angle_range",
-    "pose_p10_hip_angle",
-    "pose_avg_hip_spread",
-    "pose_max_hip_spread",
-    "pose_avg_elbow_l",
-    "pose_avg_elbow_r",
-    "pose_min_elbow_l",
-    "pose_min_elbow_r",
-    "pose_elbow_asymmetry",
+    "seq_angle_avg",
+    "seq_angle_std",
+    "zone_bl_count",
+    "zone_br_count",
+    "zone_tl_count",
+    "zone_tr_count",
+    "zone_transitions",
+    "crux_cluster_compactness",
+    "path_efficiency",
+    "max_consec_vert_gain_cm",
     "pose_pct_straight_l",
     "pose_pct_straight_r",
-    "pose_avg_shoulder_l",
-    "pose_avg_shoulder_r",
-    "pose_avg_knee_l",
-    "pose_avg_knee_r",
-    "pose_min_knee",
     "pose_avg_foot_hand_diff",
     "pose_pct_high_feet",
     "pose_avg_tension",
@@ -86,16 +76,66 @@
     "pose_avg_com_vel",
     "pose_peak_com_vel",
     "pose_avg_hand_vel",
-    "pose_peak_hand_vel",
-    "pose_avg_hip_ang_vel",
-    "pose_peak_elbow_ang_vel"
+    "pose_peak_hand_vel"
   ],
-  "best_iteration": 798,
-  "test_rmse": 0.06801,
-  "test_mae": 0.05279,
-  "val_rmse": 0.06834,
-  "grade_exact_acc": 0.2991,
-  "grade_within1_acc": 0.7094,
+  "best_iteration": 528,
+  "test_rmse": 0.06816,
+  "test_mae": 0.05221,
+  "val_rmse": 0.06892,
+  "grade_exact_acc": 0.3318,
+  "grade_within1_acc": 0.7694,
+  "per_grade_acc": {
+    "V0": {
+      "n": 142,
+      "within1_acc": 0.831,
+      "exact_acc": 0.3873
+    },
+    "V1": {
+      "n": 116,
+      "within1_acc": 0.7931,
+      "exact_acc": 0.4483
+    },
+    "V2": {
+      "n": 64,
+      "within1_acc": 0.9062,
+      "exact_acc": 0.2812
+    },
+    "V3": {
+      "n": 117,
+      "within1_acc": 0.8205,
+      "exact_acc": 0.4017
+    },
+    "V4": {
+      "n": 84,
+      "within1_acc": 0.7381,
+      "exact_acc": 0.25
+    },
+    "V5": {
+      "n": 62,
+      "within1_acc": 0.6935,
+      "exact_acc": 0.1774
+    },
+    "V6": {
+      "n": 25,
+      "within1_acc": 0.44,
+      "exact_acc": 0.24
+    },
+    "V7": {
+      "n": 14,
+      "within1_acc": 0.5,
+      "exact_acc": 0.0
+    },
+    "V8": {
+      "n": 8,
+      "within1_acc": 0.0,
+      "exact_acc": 0.0
+    },
+    "V9": {
+      "n": 1,
+      "within1_acc": 0.0,
+      "exact_acc": 0.0
+    }
+  },
   "xgb_params": {
     "n_estimators": 800,
     "learning_rate": 0.05,
@@ -110,5 +150,66 @@
     "random_state": 42,
     "n_jobs": -1,
     "tree_method": "hist"
-  }
+  },
+  "lgbm_available": false,
+  "use_stacking": false,
+  "use_calibration": true,
+  "top_pose_signals": [
+    {
+      "feature": "pose_pct_straight_l",
+      "abs_r": 1.0
+    },
+    {
+      "feature": "pose_pct_straight_r",
+      "abs_r": 1.0
+    },
+    {
+      "feature": "pose_avg_foot_hand_diff",
+      "abs_r": 1.0
+    },
+    {
+      "feature": "pose_pct_high_feet",
+      "abs_r": 1.0
+    },
+    {
+      "feature": "pose_com_travel",
+      "abs_r": 1.0
+    },
+    {
+      "feature": "pose_avg_com_to_hands",
+      "abs_r": 1.0
+    },
+    {
+      "feature": "pose_reach_asymmetry",
+      "abs_r": 1.0
+    },
+    {
+      "feature": "pose_peak_com_vel",
+      "abs_r": 1.0
+    },
+    {
+      "feature": "pose_avg_hand_vel",
+      "abs_r": 1.0
+    },
+    {
+      "feature": "pose_peak_hand_vel",
+      "abs_r": 1.0
+    },
+    {
+      "feature": "pose_avg_tension",
+      "abs_r": 0.069
+    },
+    {
+      "feature": "pose_p90_tension",
+      "abs_r": 0.069
+    },
+    {
+      "feature": "pose_avg_com_vel",
+      "abs_r": 0.0619
+    }
+  ],
+  "quantile_models": [
+    "difficulty_model_q10.xgb",
+    "difficulty_model_q90.xgb"
+  ]
 }
