@@ -5,6 +5,7 @@ var activeRole   = 'start';
 var suggestMode  = false;
 var predictTimer = null;
 var _creatorAnimator = null;
+var _lastPredictedGrade = null;  // for grade delta flash
 
 // ── Role Selector ─────────────────────────────────────────────────────────────
 
@@ -24,8 +25,8 @@ function onCreatorHoldClick(el, hold) {
     creatorHolds.splice(alreadyIdx, 1);
     el.className = 'hold hold-' + hold.hold_type;
   } else {
-    if (activeRole === 'finish' && creatorHolds.filter(function(h) { return h.role === 'finish'; }).length >= 1) {
-      document.getElementById('pf-status').textContent = 'Routes can only have 1 finish hold.';
+    if (activeRole === 'finish' && creatorHolds.filter(function(h) { return h.role === 'finish'; }).length >= 2) {
+      document.getElementById('pf-status').textContent = 'Routes can have at most 2 finish holds (Kilter standard).';
       document.getElementById('pf-status').className = 'pf-status warn';
       return;
     }
@@ -37,6 +38,7 @@ function onCreatorHoldClick(el, hold) {
       hold_type: hold.hold_type,
       hand_sequence: null,
     });
+    if (window.telem) window.telem.track('hold_placed', { role: activeRole, holdCount: creatorHolds.length });
     var roleClass = { start:'role-start', hand:'role-hand', foot:'role-foot-sel', finish:'role-finish' }[activeRole];
     el.className = 'hold hold-' + hold.hold_type + ' ' + roleClass;
 
@@ -59,11 +61,12 @@ function refreshCreatorBoard() {
   var size = board.offsetWidth;
   if (svg) svg.innerHTML = '';
 
-  // Assign hand sequences by Y position (bottom of board first = lower hold = earlier in sequence)
+  // Assign hand sequences by Y position — y_cm=0 is bottom of wall, y_cm increases upward.
+  // Sequence 1 = lowest hold (smallest y_cm = start hold near floor).
   var seq = 1;
   creatorHolds
     .filter(function(h) { return ['start','hand','finish'].includes(h.role); })
-    .sort(function(a, b) { return b.y_cm - a.y_cm; }) // higher y_cm = lower on board = earlier
+    .sort(function(a, b) { return a.y_cm - b.y_cm; }) // ascending: lower on wall = earlier in sequence
     .forEach(function(h) { h.hand_sequence = seq++; });
 
   // Update counters
@@ -324,6 +327,7 @@ function _clearSuggestions() {
 
 async function _fetchAndShowSuggestions() {
   try {
+    var currentGrade = (document.getElementById('pred-grade')?.textContent || '').replace('~', '');
     var res = await fetch(API + '/api/suggest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -331,6 +335,7 @@ async function _fetchAndShowSuggestions() {
         holds: creatorHolds.map(function(h) { return { x_cm: h.x_cm, y_cm: h.y_cm, role: h.role }; }),
         angle: creatorAngle,
         count: 8,
+        target_grade: _selectedAutoGrade || currentGrade || '',
       }),
     });
     var data = await res.json();
@@ -388,6 +393,8 @@ function selectAutoGrade(el, grade) {
 }
 
 async function autoGenerate() {
+  if (window.telem) window.telem.track('auto_generate_clicked', { holdCount: creatorHolds.length, angle: creatorAngle });
+
   var diffSlider  = document.getElementById('auto-difficulty');
   var countSlider = document.getElementById('auto-hold-count');
   var difficulty  = diffSlider  ? parseFloat(diffSlider.value) : 0.4;
@@ -413,7 +420,18 @@ async function autoGenerate() {
     if (data.error) { showToast('Auto-generate failed: ' + data.error, 'error'); return; }
 
     creatorHolds = data.holds.map(function(h) {
-      return { holdId: h.id, x_cm: h.x, y_cm: h.y, role: h.role, hold_type: h.hold_type, hand_sequence: null };
+      // auto_generate returns x_cm/y_cm (position coords), not x/y (board grid).
+      // Match against boardHolds by position to recover holdId so refreshCreatorBoard
+      // can highlight the correct DOM element.
+      var bh = boardHolds.find(function(b) { return b.x === h.x_cm && b.y === h.y_cm; });
+      return {
+        holdId:        bh ? bh.id : null,
+        x_cm:          h.x_cm,
+        y_cm:          h.y_cm,
+        role:          h.role,
+        hold_type:     (bh && bh.hold_type !== 'unknown') ? bh.hold_type : (h.hold_type || null),
+        hand_sequence: h.hand_sequence || null,
+      };
     });
 
     refreshCreatorBoard();
@@ -436,11 +454,14 @@ function triggerPredict() {
 }
 
 async function runPredict() {
+  if (window.telem) window.telem.track('predict_fired', { holdCount: creatorHolds.length, angle: creatorAngle });
   var handHolds = creatorHolds.filter(function(h) { return ['start','hand','finish'].includes(h.role); });
   if (handHolds.length < 2) {
     document.getElementById('pred-grade').textContent = '—';
     document.getElementById('pred-conf').textContent  = '';
     document.getElementById('grade-bar-fill').style.width = '0%';
+    var stEl = document.getElementById('pred-style-tags');
+    if (stEl) { stEl.innerHTML = ''; stEl.style.display = 'none'; }
     return;
   }
 
@@ -455,7 +476,19 @@ async function runPredict() {
     var savedClimberId = localStorage.getItem('climberId');
     if (savedClimberId) reqBody.climber_id = savedClimberId;
     var savedProfile = _getProfileForPDScore();
-    if (savedProfile) reqBody.profile = savedProfile;
+    if (savedProfile) {
+      reqBody.profile = savedProfile;
+    } else {
+      // Send weight alone for weight-adjusted grade even without full body dims
+      try {
+        var _p = JSON.parse(localStorage.getItem('climberProfile') || '{}');
+        var _wt = _p.weight;
+        if (_wt) {
+          if (_p.units === 'imperial') _wt = _wt * 0.453592;
+          reqBody.profile = { weight_kg: _wt };
+        }
+      } catch(e) {}
+    }
 
     var res = await fetch(API + '/api/predict', {
       method: 'POST',
@@ -467,12 +500,80 @@ async function runPredict() {
 
     var gradeEl = document.getElementById('pred-grade');
     var confPct = Math.round(data.confidence * 100);
+    var newGradeText = confPct < 15 ? '~' + data.grade : data.grade;
+    // Animate grade reveal only when grade changes
+    if (gradeEl.textContent !== newGradeText) {
+      gradeEl.classList.remove('updating');
+      void gradeEl.offsetWidth; // force reflow to restart animation
+      gradeEl.classList.add('updating');
+    }
+    if (window.telem) window.telem.track('predict_result', { grade: data.grade, confidence: confPct, holdCount: creatorHolds.length, style_tags: data.style_tags });
     // Below 15% confidence the model is uncertain — show grade with a tilde
-    gradeEl.textContent = confPct < 15 ? '~' + data.grade : data.grade;
-    gradeEl.style.color = confPct < 15 ? 'var(--mist)' : gradeColor(data.grade);
+    gradeEl.textContent = newGradeText;
+    var gc = confPct < 15 ? 'var(--mist)' : gradeColor(data.grade);
+    gradeEl.style.color = gc;
+    gradeEl.style.webkitTextFillColor = gc;
+    gradeEl.style.background = 'none';
+
+    // Grade delta flash — show "+1V" / "-2V" when grade changes
+    var deltaEl = document.getElementById('pred-grade-delta');
+    if (deltaEl && _lastPredictedGrade && _lastPredictedGrade !== data.grade) {
+      var prevN = parseInt(_lastPredictedGrade.replace(/[^0-9]/g, ''), 10);
+      var newN  = parseInt(data.grade.replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(prevN) && !isNaN(newN) && prevN !== newN) {
+        var diff = newN - prevN;
+        deltaEl.textContent = (diff > 0 ? '+' : '') + diff + 'V';
+        deltaEl.style.color  = diff > 0 ? 'var(--coral)' : 'var(--green)';
+        deltaEl.style.opacity = '1';
+        clearTimeout(deltaEl._fadeTimer);
+        deltaEl._fadeTimer = setTimeout(function() {
+          deltaEl.style.opacity = '0';
+        }, 2000);
+      }
+    }
+    _lastPredictedGrade = data.grade;
+
+    // Grade band from quantile models (e.g. "V5–V7" or hidden when same grade)
+    var bandEl = document.getElementById('pred-grade-band');
+    if (bandEl) {
+      if (data.grade_low && data.grade_high && data.grade_low !== data.grade_high) {
+        bandEl.textContent = data.grade_low + '–' + data.grade_high;
+        bandEl.style.display = '';
+      } else {
+        bandEl.style.display = 'none';
+      }
+    }
+
     document.getElementById('pred-conf').textContent = confPct < 15
       ? confPct + '% — uncertain'
       : confPct + '% conf';
+
+    // Style tags (dynamic, technical, endurance, compression, slab, span)
+    var styleTagsEl = document.getElementById('pred-style-tags');
+    if (styleTagsEl) {
+      styleTagsEl.innerHTML = '';
+      var tagColors = {
+        dynamic:     '#f97316',
+        technical:   '#3b82f6',
+        endurance:   '#10b981',
+        compression: '#8b5cf6',
+        slab:        '#eab308',
+        span:        '#06b6d4',
+      };
+      var tags = data.style_tags || [];
+      if (tags.length > 0) {
+        styleTagsEl.style.display = 'flex';
+        tags.forEach(function(tag) {
+          var pill = document.createElement('span');
+          pill.textContent = tag;
+          var color = tagColors[tag] || '#888';
+          pill.style.cssText = 'font-size:9px;text-transform:uppercase;letter-spacing:0.06em;padding:2px 6px;border-radius:10px;border:1px solid ' + color + ';color:' + color + ';font-weight:600;';
+          styleTagsEl.appendChild(pill);
+        });
+      } else {
+        styleTagsEl.style.display = 'none';
+      }
+    }
     document.getElementById('grade-bar-fill').style.width = (data.score * 100).toFixed(1) + '%';
 
     // Personal difficulty score (1.0–10.0 scale) — only shown when profile has body dims
@@ -483,12 +584,25 @@ async function runPredict() {
         var pdInner = document.getElementById('pred-pd-grade-val');
         if (pdInner) {
           pdInner.textContent = data.pd_personal.toFixed(1);
-          // Colour: green <4, yellow 4–7, coral >7
-          pdInner.style.color = data.pd_personal < 4 ? 'var(--teal)' :
-                                 data.pd_personal < 7 ? '#f59e0b' : 'var(--coral)';
+          // Colour: green <4, teal 4–6, amber 6–8, coral >8
+          pdInner.style.color = data.pd_personal < 4 ? 'var(--green)' :
+                                 data.pd_personal < 6 ? 'var(--teal)' :
+                                 data.pd_personal < 8 ? 'var(--amber)' : 'var(--coral)';
         }
       } else {
         pdEl.style.display = 'none';
+      }
+    }
+
+    // Weight-adjusted grade (only if API returned it)
+    var wtAdjEl = document.getElementById('pred-weight-adj');
+    if (wtAdjEl) {
+      if (data.grade_weight_adjusted) {
+        wtAdjEl.style.display = '';
+        var wtVal = document.getElementById('pred-weight-adj-val');
+        if (wtVal) wtVal.textContent = data.grade_weight_adjusted;
+      } else {
+        wtAdjEl.style.display = 'none';
       }
     }
 
@@ -497,6 +611,26 @@ async function runPredict() {
       document.getElementById('dna-' + k).style.width = (dna[k] || 0) + '%';
       document.getElementById('dna-' + k + '-v').textContent = dna[k] || 0;
     });
+
+    // SHAP explanation: "Why this grade?"
+    var explainEl = document.getElementById('pred-explanation');
+    if (explainEl) {
+      var expl = data.explanation || [];
+      if (expl.length > 0) {
+        explainEl.innerHTML = '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:var(--mist);margin-bottom:6px;">Why this grade?</div>' +
+          expl.slice(0, 3).map(function(e) {
+            var color = e.direction === 'harder' ? 'var(--coral)' : 'var(--teal)';
+            var arrow = e.direction === 'harder' ? '↑' : '↓';
+            return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">' +
+              '<span style="font-size:10px;color:var(--white);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + e.label + '</span>' +
+              '<span style="font-size:10px;color:' + color + ';margin-left:8px;flex-shrink:0;font-family:var(--mono);">' + arrow + e.delta_grades.toFixed(1) + 'V</span>' +
+              '</div>';
+          }).join('');
+        explainEl.style.display = '';
+      } else {
+        explainEl.style.display = 'none';
+      }
+    }
   } catch(e) { /* API down — fail silently */ }
 }
 
@@ -525,7 +659,11 @@ function clearCreator() {
   creatorHolds = [];
   refreshCreatorBoard();
   updatePathfinderStatus();
-  document.getElementById('pred-grade').textContent = '—';
+  var clearGradeEl = document.getElementById('pred-grade');
+  clearGradeEl.textContent = '—';
+  clearGradeEl.style.color = '';
+  clearGradeEl.style.webkitTextFillColor = '';
+  clearGradeEl.style.background = '';
   document.getElementById('pred-conf').textContent  = '';
   document.getElementById('grade-bar-fill').style.width = '0%';
   var pdEl = document.getElementById('pred-pd-grade');
@@ -536,6 +674,33 @@ function clearCreator() {
   });
 }
 
+function exportRouteText() {
+  if (!creatorHolds.length) { showToast('Add some holds first.', 'warn'); return; }
+  var grade = document.getElementById('pred-grade').textContent.replace('~', '') || '?';
+  var lines = [
+    'ClimbingML Route Export',
+    'Grade: ' + grade + '  |  Angle: ' + creatorAngle + '°  |  Holds: ' + creatorHolds.length,
+    '',
+  ];
+  var seq = 1;
+  ['start', 'hand', 'finish', 'foot'].forEach(function(role) {
+    var roleHolds = creatorHolds.filter(function(h) { return h.role === role; });
+    roleHolds.forEach(function(h) {
+      var label = role === 'start' ? 'START' : role === 'finish' ? 'FINISH' : role === 'foot' ? 'FOOT' : '#' + seq++;
+      lines.push(label + '  x=' + Math.round(h.x_cm) + 'cm  y=' + Math.round(h.y_cm) + 'cm' + (h.hold_type ? '  [' + h.hold_type + ']' : ''));
+    });
+  });
+  lines.push('', 'Generated by ClimbingML');
+
+  var blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'route_' + grade + '_' + creatorAngle + 'deg.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  if (window.telem) window.telem.track('route_saved', { holdCount: creatorHolds.length, angle: creatorAngle, type: 'export' });
+}
+
 async function saveDraftRoute() {
   var starts   = creatorHolds.filter(function(h) { return h.role === 'start'; }).length;
   var finishes = creatorHolds.filter(function(h) { return h.role === 'finish'; }).length;
@@ -544,6 +709,8 @@ async function saveDraftRoute() {
   if (starts < 1)   { showToast('Add at least 1 start hold.', 'warn'); return; }
   if (finishes < 1) { showToast('Add a finish hold.', 'warn'); return; }
   if (hands < 1)    { showToast('Add at least 1 hand hold.', 'warn'); return; }
+
+  if (window.telem) window.telem.track('route_saved', { holdCount: creatorHolds.length, angle: creatorAngle });
 
   var grade = document.getElementById('pred-grade').textContent.replace('~', '');
   var conf  = parseFloat((document.getElementById('pred-conf').textContent || '0')) / 100 || 0;
@@ -570,3 +737,47 @@ async function saveDraftRoute() {
     showToast('Could not save — is the API running?', 'error');
   }
 }
+
+// ── Circuit Builder (in-progress circuit) ────────────────────────────────────
+
+var _circuitRoutes = []; // { name, grade, holds_count, angle, holds }
+
+function renderCircuitBuildList() {
+  var el = document.getElementById('circuit-build-list');
+  if (!el) return;
+  if (!_circuitRoutes.length) {
+    el.innerHTML = '<div style="font-size:10px;color:var(--mist);padding:4px 0;">No routes added yet. Generate or place holds, then add.</div>';
+    return;
+  }
+  el.innerHTML = _circuitRoutes.map(function(r, i) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);">' +
+      '<span style="font-size:11px;color:var(--chalk);">' + (r.name||'Route '+(i+1)) + ' · ' + (r.grade||'?') + '</span>' +
+      '<button onclick="_circuitRoutes.splice('+i+',1);renderCircuitBuildList()" style="background:none;border:none;color:var(--mist);cursor:pointer;font-size:12px;padding:0 4px;">×</button>' +
+    '</div>';
+  }).join('');
+}
+
+function addCurrentToCircuit() {
+  var grade = document.getElementById('circuit-add-grade').value || document.getElementById('pred-grade')?.textContent?.replace('~','') || '';
+  if (!creatorHolds.length) { if (typeof showToast==='function') showToast('Place some holds first'); return; }
+  var name = 'Route ' + (_circuitRoutes.length + 1);
+  _circuitRoutes.push({ name: name, grade: grade, holds_count: creatorHolds.length, angle: creatorAngle, holds: JSON.parse(JSON.stringify(creatorHolds)) });
+  renderCircuitBuildList();
+  if (typeof showToast==='function') showToast('Added to circuit: ' + grade + ' · ' + creatorHolds.length + ' holds');
+}
+
+function saveCurrentCircuit() {
+  if (!_circuitRoutes.length) { if (typeof showToast==='function') showToast('Add routes to the circuit first'); return; }
+  var name = document.getElementById('circuit-name-input').value.trim() || 'Circuit ' + new Date().toLocaleDateString();
+  if (typeof createCircuit === 'function') {
+    var savedCount = _circuitRoutes.length;
+    createCircuit(name, _circuitRoutes);
+    _circuitRoutes = [];
+    renderCircuitBuildList();
+    document.getElementById('circuit-name-input').value = '';
+    if (typeof showToast==='function') showToast('Circuit "' + name + '" saved — ' + savedCount + ' routes');
+  }
+}
+
+// Init circuit list on page load
+document.addEventListener('DOMContentLoaded', function() { renderCircuitBuildList(); });

@@ -234,7 +234,10 @@
       <div class="grade-meter">
         <div class="creator-label">Predicted Grade</div>
         <div class="grade-display">
-          <div class="grade-big" id="pred-grade">—</div>
+          <div style="display:flex;align-items:baseline;gap:8px;">
+            <div class="grade-big" id="pred-grade">—</div>
+            <div id="pred-grade-delta" style="font-size:13px;font-weight:700;font-family:var(--mono);opacity:0;transition:opacity 0.3s;"></div>
+          </div>
           <div id="pred-grade-band" style="display:none;font-size:11px;color:var(--mist);margin-top:2px;letter-spacing:0.03em;"></div>
           <div class="grade-conf" id="pred-conf"></div>
           <div id="pred-style-tags" style="display:none;margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;"></div>

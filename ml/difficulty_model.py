@@ -284,7 +284,8 @@ def get_feature_cols(df: pd.DataFrame) -> list:
 
 def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Clip outlier geometry values and fill missing foot-geometry with 0.
+    Clip outlier geometry values, fill missing foot-geometry with 0,
+    and add angle interaction features.
     """
     foot_cols = [
         "avg_foot_spread_cm", "avg_hand_to_foot_cm",
@@ -298,6 +299,28 @@ def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
     for col in reach_cols:
         if col in df.columns:
             df[col] = df[col].clip(upper=300.0)
+
+    # ── Angle interaction features ────────────────────────────────────────────
+    # board_angle_deg is the 3rd most important feature (8% gain). Explicit
+    # interactions let the model capture non-linear angle × geometry effects
+    # without requiring deep splits.
+    if "board_angle_deg" in df.columns:
+        angle = df["board_angle_deg"]
+        angle_norm = (angle - 40.0) / 20.0   # centre at 40°, scale by 20°
+
+        if "avg_reach_cm" in df.columns:
+            df["angle_x_reach"] = angle_norm * df["avg_reach_cm"].clip(upper=300.0)
+        if "height_span_cm" in df.columns:
+            df["angle_x_height_span"] = angle_norm * df["height_span_cm"]
+        if "dyno_score" in df.columns:
+            df["angle_x_dyno"] = angle_norm * df["dyno_score"]
+        # Angle group (slab=0, vertical=1, slight-overhang=2, overhang=3)
+        df["angle_group"] = pd.cut(
+            angle,
+            bins=[-1, 25, 35, 45, 999],
+            labels=[0, 1, 2, 3],
+        ).astype(float).fillna(1.0)
+        print(f"  Angle interaction features added (angle_x_reach, angle_x_height_span, angle_x_dyno, angle_group)")
 
     return df
 
