@@ -730,6 +730,7 @@ def main():
     parser.add_argument("--video",          help="Path to a single video file")
     parser.add_argument("--video-dir",      help="Directory of video files to batch process")
     parser.add_argument("--attempt-id",     help="UUID to link pose_frames to (single video mode)")
+    parser.add_argument("--climb-uuid",     help="Kilter climb UUID to tag this video's frames")
     parser.add_argument("--attempt-id-map", help='JSON file: {"filename.mp4": "uuid", ...}')
     parser.add_argument("--sample-fps",     type=float, default=10.0)
     parser.add_argument("--min-confidence", type=float, default=0.5)
@@ -760,6 +761,7 @@ def main():
             dry_run=args.dry_run,
             verbose=True,
             filter_climbing=args.filter_climbing,
+            climb_uuid=args.climb_uuid,
         )
         return
 

@@ -1,0 +1,2597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kilter Intelligence — Train Smarter on Your Kilter Board</title>
+<meta name="description" content="The Kilter Board has 628,000 routes. Kilter Intelligence finds the ones that are right for your body, your grade, and your weaknesses. AI-powered training analytics built for serious climbers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & BASE ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg:      #060A0D;
+  --bg2:     #0A1018;
+  --bg3:     #0F1822;
+  --border:  rgba(255,255,255,0.07);
+  --teal:    #00E5C8;
+  --teal2:   #00B8A0;
+  --purple:  #9B6DFF;
+  --amber:   #F5B000;
+  --coral:   #FF5C3A;
+  --green:   #1EE07A;
+  --white:   #ECEFED;
+  --mist:    #6A8090;
+  --mist2:   #3A5060;
+  --mono:    'Space Mono', monospace;
+  --sans:    'Inter', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+a { text-decoration: none; color: inherit; }
+img { display: block; max-width: 100%; }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes gradientShift {
+  0%,100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+@keyframes scanline {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(400%); }
+}
+@keyframes float {
+  0%,100% { transform: translateY(0px); }
+  50%      { transform: translateY(-8px); }
+}
+@keyframes counterUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up { animation: fadeUp 0.7s ease forwards; }
+.fade-up-1 { animation: fadeUp 0.7s 0.1s ease both; }
+.fade-up-2 { animation: fadeUp 0.7s 0.2s ease both; }
+.fade-up-3 { animation: fadeUp 0.7s 0.35s ease both; }
+.fade-up-4 { animation: fadeUp 0.7s 0.5s ease both; }
+
+/* ── NAV ── */
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  padding: 0 5%;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(6,10,13,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--teal), var(--purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nav-logo svg { flex-shrink: 0; }
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mist);
+}
+.nav-links a:hover { color: var(--white); transition: color 0.2s; }
+.nav-cta {
+  background: var(--teal);
+  color: #060A0D !important;
+  font-weight: 700 !important;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 12px !important;
+  letter-spacing: 0.03em;
+  transition: box-shadow 0.2s, transform 0.15s !important;
+}
+.nav-cta:hover {
+  box-shadow: 0 0 20px rgba(0,229,200,0.4);
+  transform: translateY(-1px);
+}
+
+/* ── HERO ── */
+.hero {
+  min-height: 100vh;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 480px;
+  align-items: center;
+  gap: 56px;
+  padding: 120px 5% 80px;
+  overflow: hidden;
+}
+.hero-visual {
+  position: relative;
+  z-index: 1;
+  height: 580px;
+}
+#landing-physics {
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(0,229,200,0.12);
+  box-shadow: 0 0 80px rgba(0,229,200,0.06), 0 0 160px rgba(155,109,255,0.05), inset 0 0 40px rgba(0,0,0,0.4);
+  display: block;
+}
+@media (max-width: 1100px) {
+  .hero { grid-template-columns: 1fr; }
+  .hero-visual { display: none; }
+}
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url('https://images.unsplash.com/photo-1522163182402-834f871fd851?auto=format&fit=crop&w=1800&q=80');
+  background-size: cover;
+  background-position: center 30%;
+  filter: brightness(0.22) saturate(0.8);
+  transform: scale(1.03);
+}
+.hero-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(6,10,13,0.9) 0%, rgba(6,10,13,0.5) 50%, rgba(6,10,13,0.85) 100%);
+}
+.hero-glow {
+  position: absolute;
+  top: 20%;
+  left: 10%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(ellipse, rgba(0,229,200,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-glow-2 {
+  position: absolute;
+  bottom: 10%;
+  right: 5%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(155,109,255,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 680px;
+}
+.hero-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hero-eyebrow::before {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 1px;
+  background: var(--teal);
+}
+.hero-headline {
+  font-size: clamp(42px, 5.5vw, 72px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin-bottom: 24px;
+}
+.hero-headline .accent {
+  background: linear-gradient(135deg, var(--teal) 0%, #60EFDF 40%, var(--purple) 100%);
+  background-size: 200% 200%;
+  animation: gradientShift 4s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero-sub {
+  font-size: 18px;
+  font-weight: 400;
+  color: rgba(236,239,237,0.7);
+  line-height: 1.65;
+  margin-bottom: 40px;
+  max-width: 520px;
+}
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--teal) 0%, #20C5B0 100%);
+  color: #060A0D;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 14px 28px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.15s;
+  font-family: var(--sans);
+  letter-spacing: 0.01em;
+  display: inline-block;
+  box-shadow: 0 4px 24px rgba(0,229,200,0.25);
+}
+.btn-primary:hover {
+  box-shadow: 0 8px 32px rgba(0,229,200,0.4);
+  transform: translateY(-2px);
+}
+.btn-ghost {
+  color: rgba(236,239,237,0.6);
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.2s;
+}
+.btn-ghost:hover { color: var(--white); }
+.hero-proof {
+  margin-top: 56px;
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+.hero-proof-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hero-proof-num {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--teal);
+}
+.hero-proof-label {
+  font-size: 11px;
+  color: var(--mist);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-family: var(--mono);
+}
+.hero-divider {
+  width: 1px;
+  background: var(--border);
+  align-self: stretch;
+}
+
+/* ── PROBLEM STRIP ── */
+.problem-strip {
+  background: #0A1018;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 28px 5%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+.problem-item {
+  flex: 1;
+  max-width: 280px;
+  padding: 0 32px;
+  border-right: 1px solid var(--border);
+}
+.problem-item:last-child { border-right: none; }
+.problem-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--coral);
+  margin-bottom: 6px;
+}
+.problem-text {
+  font-size: 13px;
+  color: rgba(236,239,237,0.55);
+  line-height: 1.5;
+}
+
+/* ── SECTION COMMONS ── */
+section { padding: 100px 5%; }
+.section-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 16px;
+}
+.section-title {
+  font-size: clamp(28px, 3.5vw, 44px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  margin-bottom: 16px;
+}
+.section-sub {
+  font-size: 16px;
+  color: rgba(236,239,237,0.6);
+  line-height: 1.65;
+  max-width: 520px;
+}
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+.split.reverse { direction: rtl; }
+.split.reverse > * { direction: ltr; }
+
+/* ── STATS BAND ── */
+.stats-band {
+  background: linear-gradient(135deg, rgba(0,229,200,0.04) 0%, rgba(155,109,255,0.04) 100%);
+  border-top: 1px solid rgba(0,229,200,0.12);
+  border-bottom: 1px solid rgba(0,229,200,0.12);
+  padding: 60px 5%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background-clip: padding-box;
+}
+.stat-item {
+  padding: 32px 40px;
+  text-align: center;
+  border-right: 1px solid var(--border);
+  position: relative;
+}
+.stat-item:last-child { border-right: none; }
+.stat-num {
+  font-family: var(--mono);
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--teal), var(--purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: block;
+  margin-bottom: 8px;
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--mist);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-family: var(--mono);
+}
+.stat-sub {
+  font-size: 11px;
+  color: var(--mist2);
+  margin-top: 4px;
+}
+
+/* ── HOW IT WORKS ── */
+.how-section {
+  padding: 90px 5%;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.how-header {
+  text-align: center;
+  max-width: 560px;
+  margin: 0 auto 64px;
+}
+.how-steps {
+  display: grid;
+  grid-template-columns: 1fr 40px 1fr 40px 1fr;
+  align-items: start;
+  max-width: 900px;
+  margin: 0 auto;
+}
+@media (max-width: 760px) {
+  .how-steps { grid-template-columns: 1fr; }
+  .how-arrow { display: none; }
+}
+.how-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+.how-step-num {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(0,229,200,0.12), rgba(155,109,255,0.12));
+  border: 1px solid rgba(0,229,200,0.25);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--teal);
+  flex-shrink: 0;
+  position: relative;
+}
+.how-step-num::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,229,200,0.08);
+}
+.how-step-icon {
+  font-size: 22px;
+  margin-bottom: 2px;
+}
+.how-step-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--white);
+  line-height: 1.3;
+}
+.how-step-desc {
+  font-size: 13px;
+  color: rgba(236,239,237,0.55);
+  line-height: 1.6;
+  max-width: 220px;
+}
+.how-step-tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--teal);
+  background: rgba(0,229,200,0.08);
+  border: 1px solid rgba(0,229,200,0.15);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.how-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 24px;
+  color: rgba(255,255,255,0.12);
+}
+
+/* ── FEATURE: PERSONAL GRADE ── */
+.feature-personal {
+  background: var(--bg);
+}
+.pd-card {
+  background: linear-gradient(145deg, #0F1822, #0A1318);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+  animation: float 6s ease-in-out infinite;
+}
+.pd-card::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(155,109,255,0.12) 0%, transparent 70%);
+}
+.pd-card-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--purple);
+  margin-bottom: 20px;
+}
+.pd-score-display {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.pd-score-big {
+  font-family: var(--mono);
+  font-size: 72px;
+  font-weight: 700;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--purple), #C084FC);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.pd-score-max {
+  font-family: var(--mono);
+  font-size: 22px;
+  color: var(--mist2);
+  font-weight: 400;
+}
+.pd-score-label {
+  font-size: 12px;
+  color: var(--mist);
+  margin-bottom: 24px;
+}
+.pd-bar-track {
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.pd-bar-fill {
+  height: 100%;
+  width: 73%;
+  background: linear-gradient(90deg, var(--purple), #C084FC);
+  border-radius: 3px;
+  position: relative;
+}
+.pd-bar-fill::after {
+  content: '';
+  position: absolute;
+  right: 0; top: -2px; bottom: -2px;
+  width: 3px;
+  background: white;
+  border-radius: 2px;
+  box-shadow: 0 0 6px rgba(255,255,255,0.6);
+}
+.pd-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--mist2);
+  margin-bottom: 24px;
+}
+.pd-body-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.pd-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pd-stat-val {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--teal);
+}
+.pd-stat-lbl {
+  font-size: 10px;
+  color: var(--mist2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── FEATURE: ROUTE GENERATOR ── */
+.feature-generator {
+  background: var(--bg2);
+}
+.gen-card {
+  background: #0A1018;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+.gen-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gen-dot { width: 10px; height: 10px; border-radius: 50%; }
+.gen-grades {
+  display: flex;
+  gap: 6px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.gen-grade-pill {
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  color: var(--mist);
+  cursor: default;
+}
+.gen-grade-pill.active {
+  background: rgba(0,229,200,0.12);
+  border-color: rgba(0,229,200,0.4);
+  color: var(--teal);
+}
+.gen-route-list { padding: 8px 0; }
+.gen-route {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 0.1s;
+}
+.gen-route:last-child { border-bottom: none; }
+.gen-route:hover { background: rgba(255,255,255,0.02); }
+.gen-route-grade {
+  width: 36px;
+  height: 22px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.gen-route-name { flex: 1; font-size: 12px; color: var(--white); font-weight: 500; }
+.gen-route-meta { font-size: 10px; color: var(--mist); font-family: var(--mono); }
+.gen-route-pd {
+  font-size: 10px;
+  font-family: var(--mono);
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(155,109,255,0.12);
+  color: var(--purple);
+  border: 1px solid rgba(155,109,255,0.2);
+}
+.gen-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.gen-generate-btn {
+  background: linear-gradient(135deg, var(--teal), #20C5B0);
+  color: #060A0D;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 8px 20px;
+  border-radius: 6px;
+  border: none;
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+/* ── FEATURE: VIDEO COACH ── */
+.feature-coach {
+  background: var(--bg);
+}
+.coach-card {
+  background: #0A1018;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+.coach-video-area {
+  position: relative;
+  background: #070E16;
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.coach-video-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url('https://images.unsplash.com/photo-1564769625905-50e93615e769?auto=format&fit=crop&w=800&q=70');
+  background-size: cover;
+  background-position: center;
+  filter: brightness(0.3) saturate(0.5);
+}
+.coach-scanline {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,229,200,0.6), transparent);
+  animation: scanline 3s linear infinite;
+}
+.coach-overlay-text {
+  position: relative;
+  z-index: 1;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--teal);
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+.coach-overlay-text div { margin-bottom: 4px; }
+.coach-pose-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--teal);
+  display: inline-block;
+  margin-right: 6px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.coach-insights { padding: 20px; }
+.insight-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.insight-item:last-child { border-bottom: none; }
+.insight-score {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.insight-score.good { background: rgba(30,224,122,0.1); color: var(--green); }
+.insight-score.warn { background: rgba(245,176,0,0.1); color: var(--amber); }
+.insight-score.bad  { background: rgba(255,92,58,0.1); color: var(--coral); }
+.insight-body { flex: 1; }
+.insight-title { font-size: 13px; font-weight: 600; color: var(--white); margin-bottom: 3px; }
+.insight-desc { font-size: 11px; color: var(--mist); line-height: 1.5; }
+.insight-drill {
+  margin-top: 6px;
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--teal);
+  background: rgba(0,229,200,0.06);
+  border: 1px solid rgba(0,229,200,0.12);
+  border-radius: 4px;
+  padding: 4px 8px;
+  display: inline-block;
+}
+
+/* ── FEATURE: ANALYTICS ── */
+.feature-analytics {
+  background: var(--bg2);
+}
+.analytics-card {
+  background: #0A1018;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px;
+}
+.analytics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.analytics-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mist);
+}
+.analytics-period {
+  font-size: 11px;
+  color: var(--mist2);
+  font-family: var(--mono);
+}
+.analytics-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 80px;
+  margin-bottom: 20px;
+}
+.chart-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  justify-content: flex-end;
+}
+.chart-bar {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  min-height: 4px;
+}
+.chart-label {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--mist2);
+  text-align: center;
+}
+.analytics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.analytics-stat {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.analytics-stat-num {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--teal);
+  margin-bottom: 2px;
+}
+.analytics-stat-lbl {
+  font-size: 10px;
+  color: var(--mist);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.weakness-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.weakness-label {
+  font-size: 11px;
+  color: var(--mist);
+  width: 90px;
+  flex-shrink: 0;
+}
+.weakness-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.weakness-fill { height: 100%; border-radius: 2px; }
+.weakness-val {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--mist);
+  width: 28px;
+  text-align: right;
+}
+
+/* ── PHOTO BREAK ── */
+.photo-break {
+  height: 480px;
+  position: relative;
+  overflow: hidden;
+}
+.photo-break img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 40%;
+  filter: brightness(0.45) saturate(0.7);
+}
+.photo-break-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--bg) 0%, transparent 30%, transparent 70%, var(--bg) 100%);
+}
+.photo-break-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  padding: 0 5%;
+}
+.photo-break-quote {
+  font-size: clamp(22px, 3vw, 36px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  max-width: 700px;
+  line-height: 1.2;
+  margin-bottom: 16px;
+}
+.photo-break-quote .hl {
+  background: linear-gradient(135deg, var(--teal), var(--purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.photo-break-source {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mist);
+  letter-spacing: 0.1em;
+}
+
+/* ── TESTIMONIALS ── */
+.testimonials {
+  background: var(--bg2);
+  padding: 100px 5%;
+}
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 60px;
+}
+.testimonial-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  position: relative;
+}
+.testimonial-card::before {
+  content: '"';
+  position: absolute;
+  top: 20px; right: 24px;
+  font-size: 60px;
+  line-height: 1;
+  color: rgba(0,229,200,0.12);
+  font-family: Georgia, serif;
+  font-weight: 700;
+}
+.testimonial-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(236,239,237,0.75);
+  margin-bottom: 24px;
+}
+.testimonial-author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.testimonial-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--teal), var(--purple));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--bg);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.testimonial-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.testimonial-name { font-size: 13px; font-weight: 600; color: var(--white); }
+.testimonial-grade {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--teal);
+  margin-top: 2px;
+}
+
+/* ── COMPARISON TABLE ── */
+.comparison {
+  background: var(--bg);
+  padding: 100px 5%;
+}
+.comparison-table {
+  margin-top: 60px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.comparison-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  border-bottom: 1px solid var(--border);
+}
+.comparison-row:last-child { border-bottom: none; }
+.comparison-row.header {
+  background: rgba(255,255,255,0.02);
+}
+.comparison-cell {
+  padding: 16px 20px;
+  font-size: 13px;
+  color: rgba(236,239,237,0.6);
+  border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+}
+.comparison-cell:last-child { border-right: none; }
+.comparison-cell.feature-name { color: var(--white); font-weight: 500; }
+.comparison-cell.header-cell {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mist);
+  justify-content: center;
+}
+.comparison-cell.ours {
+  background: linear-gradient(180deg, rgba(0,229,200,0.05) 0%, rgba(0,229,200,0.02) 100%);
+  color: var(--teal);
+  font-weight: 600;
+  justify-content: center;
+  position: relative;
+}
+.comparison-cell.ours::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(0,229,200,0.5), rgba(0,229,200,0.1));
+}
+.comparison-cell.ours.header-cell {
+  color: var(--teal);
+  background: linear-gradient(180deg, rgba(0,229,200,0.09), rgba(0,229,200,0.04));
+}
+.comparison-cell.ours.header-cell::before {
+  background: linear-gradient(180deg, var(--teal), rgba(0,229,200,0.3));
+}
+.comparison-cell.center { justify-content: center; }
+.check { color: var(--green); font-size: 16px; }
+.cross { color: var(--mist2); font-size: 16px; }
+.partial { color: var(--amber); font-size: 11px; font-family: var(--mono); }
+
+/* ── PRICING ── */
+.pricing {
+  background: var(--bg2);
+  padding: 100px 5%;
+}
+.pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+  margin-top: 60px;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.pricing-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 32px;
+  position: relative;
+}
+.pricing-card.featured {
+  border-color: rgba(0,229,200,0.3);
+  background: linear-gradient(160deg, rgba(0,229,200,0.04), rgba(155,109,255,0.04));
+}
+.pricing-card.featured::before {
+  content: 'MOST POPULAR';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--teal), #20C5B0);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  padding: 4px 14px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.pricing-tier {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--mist);
+  margin-bottom: 16px;
+}
+.pricing-price {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 4px;
+  color: var(--white);
+}
+.pricing-price span {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--mist);
+  letter-spacing: 0;
+}
+.pricing-desc {
+  font-size: 12px;
+  color: var(--mist);
+  margin-bottom: 28px;
+  line-height: 1.5;
+}
+.pricing-features { list-style: none; margin-bottom: 28px; }
+.pricing-features li {
+  font-size: 13px;
+  color: rgba(236,239,237,0.7);
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pricing-features li:last-child { border-bottom: none; }
+.pricing-features li::before {
+  content: '✓';
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.pricing-features li.dim::before { color: var(--mist2); content: '·'; font-size: 20px; }
+.pricing-features li.dim { color: var(--mist2); }
+.pricing-cta {
+  display: block;
+  text-align: center;
+  padding: 11px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+.pricing-cta.primary {
+  background: linear-gradient(135deg, var(--teal), #20C5B0);
+  color: var(--bg);
+  box-shadow: 0 4px 20px rgba(0,229,200,0.2);
+}
+.pricing-cta.primary:hover { box-shadow: 0 6px 28px rgba(0,229,200,0.35); transform: translateY(-1px); }
+.pricing-cta.ghost {
+  border: 1px solid var(--border);
+  color: var(--mist);
+}
+.pricing-cta.ghost:hover { border-color: rgba(255,255,255,0.2); color: var(--white); }
+
+/* ── FINAL CTA ── */
+.final-cta {
+  padding: 120px 5%;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.final-cta-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url('https://images.unsplash.com/photo-1517963879433-6ad2b056d712?auto=format&fit=crop&w=1800&q=70');
+  background-size: cover;
+  background-position: center;
+  filter: brightness(0.15) saturate(0.5);
+}
+.final-cta-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 800px;
+  height: 400px;
+  background: radial-gradient(ellipse, rgba(0,229,200,0.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+.final-cta-content {
+  position: relative;
+  z-index: 1;
+}
+.final-cta-title {
+  font-size: clamp(32px, 5vw, 60px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: 20px;
+}
+.final-cta-sub {
+  font-size: 17px;
+  color: rgba(236,239,237,0.6);
+  max-width: 480px;
+  margin: 0 auto 40px;
+  line-height: 1.65;
+}
+.final-cta-note {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--mist2);
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+}
+
+/* ── FOOTER ── */
+footer {
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  padding: 40px 5%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.footer-logo {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--mist2);
+}
+.footer-links {
+  display: flex;
+  gap: 28px;
+  font-size: 12px;
+  color: var(--mist2);
+}
+.footer-links a:hover { color: var(--white); transition: color 0.2s; }
+.footer-copy {
+  font-size: 11px;
+  color: var(--mist2);
+  font-family: var(--mono);
+}
+
+/* ── SCROLL REVEAL ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.65s ease, transform 0.65s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 960px) {
+  .split { grid-template-columns: 1fr; gap: 48px; }
+  .split.reverse { direction: ltr; }
+  .stats-band { grid-template-columns: repeat(2, 1fr); }
+  .stat-item:nth-child(2) { border-right: none; }
+  .testimonials-grid { grid-template-columns: 1fr; }
+  .pricing-grid { grid-template-columns: 1fr; max-width: 380px; }
+  .comparison-table { overflow-x: auto; }
+  .comparison-row { min-width: 600px; }
+  .problem-strip { flex-direction: column; }
+  .problem-item { border-right: none; border-bottom: 1px solid var(--border); padding: 16px 0; max-width: 100%; }
+  .problem-item:last-child { border-bottom: none; }
+  .nav-links { display: none; }
+}
+@media (max-width: 600px) {
+  .stats-band { grid-template-columns: 1fr 1fr; }
+  .hero-proof { gap: 20px; }
+  .hero-proof-num { font-size: 18px; }
+  section { padding: 60px 5%; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <polygon points="7,1.5 12.5,11.5 1.5,11.5" fill="none" stroke="url(#g1)" stroke-width="1.4" stroke-linejoin="round"/>
+      <defs><linearGradient id="g1" x1="1.5" y1="11.5" x2="12.5" y2="1.5" gradientUnits="userSpaceOnUse"><stop stop-color="#00E5C8"/><stop offset="1" stop-color="#9B6DFF"/></linearGradient></defs>
+    </svg>
+    KILTER / INTELLIGENCE
+  </div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#compare">Compare</a>
+    <a href="#pricing">Pricing</a>
+    <a href="index.html" class="nav-cta">Open App</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-glow-2"></div>
+  <div class="hero-content">
+    <div class="hero-eyebrow fade-up-1">Built for serious Kilter Board climbers</div>
+    <h1 class="hero-headline fade-up-2">
+      Your grade isn't a number.<br>
+      <span class="accent">It's your body on that wall.</span>
+    </h1>
+    <p class="hero-sub fade-up-3">
+      The official app knows 628,000 routes. It has no idea who you are. Kilter Intelligence uses your body measurements and movement patterns to find the routes that will actually move you forward — and tells you exactly why you're getting shut down.
+    </p>
+    <div class="hero-actions fade-up-4">
+      <a href="index.html" class="btn-primary">Start Training Smarter</a>
+      <a href="#features" class="btn-ghost">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+        </svg>
+        See how it works
+      </a>
+    </div>
+    <div class="hero-proof fade-up-4">
+      <div class="hero-proof-item">
+        <span class="hero-proof-num">628K</span>
+        <span class="hero-proof-label">Routes indexed</span>
+      </div>
+      <div class="hero-divider"></div>
+      <div class="hero-proof-item">
+        <span class="hero-proof-num">80.8%</span>
+        <span class="hero-proof-label">Grade accuracy</span>
+      </div>
+      <div class="hero-divider"></div>
+      <div class="hero-proof-item">
+        <span class="hero-proof-num">V1–V10+</span>
+        <span class="hero-proof-label">Grade targeting</span>
+      </div>
+      <div class="hero-divider"></div>
+      <div class="hero-proof-item">
+        <span class="hero-proof-num">1–10</span>
+        <span class="hero-proof-label">Personal score</span>
+      </div>
+    </div>
+  </div>
+  <!-- Physics board visualization -->
+  <div class="hero-visual">
+    <canvas id="landing-physics"></canvas>
+  </div>
+</section>
+
+<!-- PROBLEM STRIP -->
+<div class="problem-strip">
+  <div class="problem-item">
+    <div class="problem-tag">The official app</div>
+    <div class="problem-text">Crashes, no analytics, grades feel wrong below V4, can't run in the background</div>
+  </div>
+  <div class="problem-item">
+    <div class="problem-tag">Crimpd / Lattice</div>
+    <div class="problem-text">Generic training plans. Zero Kilter Board integration. Your board sessions are invisible to them</div>
+  </div>
+  <div class="problem-item">
+    <div class="problem-tag">Spreadsheets</div>
+    <div class="problem-text">You track sessions manually, forget what you projected last week, have no idea what's actually a weakness</div>
+  </div>
+</div>
+
+<!-- STATS BAND -->
+<div class="stats-band">
+  <div class="stat-item">
+    <span class="stat-num">628,548</span>
+    <div class="stat-label">Routes indexed</div>
+    <div class="stat-sub">across all Kilter angles</div>
+  </div>
+  <div class="stat-item">
+    <span class="stat-num">190K+</span>
+    <div class="stat-label">Pose frames analyzed</div>
+    <div class="stat-sub">real climbing body data</div>
+  </div>
+  <div class="stat-item">
+    <span class="stat-num" data-count="77">77</span>
+    <div class="stat-label">Route features</div>
+    <div class="stat-sub">per-route ML model inputs</div>
+  </div>
+  <div class="stat-item">
+    <span class="stat-num">0–70°</span>
+    <div class="stat-label">All angles covered</div>
+    <div class="stat-sub">slab to steep overhang</div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="how-section">
+  <div class="how-header">
+    <div class="section-eyebrow" style="justify-content:center;display:flex;">How it works</div>
+    <h2 class="section-title">From your body stats to your next project</h2>
+    <p class="section-sub" style="margin:0 auto;text-align:center;">Three inputs. One system that actually knows your Kilter Board.</p>
+  </div>
+  <div class="how-steps">
+    <div class="how-step">
+      <div class="how-step-num">01</div>
+      <div>
+        <div class="how-step-title">Enter your body profile</div>
+        <p class="how-step-desc">Height, wingspan, weight. Takes 20 seconds. This is what every other training app ignores — your body changes what every route actually feels like.</p>
+        <span class="how-step-tag">One-time setup</span>
+      </div>
+    </div>
+    <div class="how-arrow">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M5 12h14M13 6l6 6-6 6"/>
+      </svg>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">02</div>
+      <div>
+        <div class="how-step-title">AI scores every route for your body</div>
+        <p class="how-step-desc">The model analyzes 77 route features — hold positions, reach requirements, angle, hold type distribution — and scores each route 1–10 specifically for you.</p>
+        <span class="how-step-tag" style="color:var(--purple);background:rgba(155,109,255,0.08);border-color:rgba(155,109,255,0.15);">80.8% grade accuracy</span>
+      </div>
+    </div>
+    <div class="how-arrow">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M5 12h14M13 6l6 6-6 6"/>
+      </svg>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">03</div>
+      <div>
+        <div class="how-step-title">Train with data, not guesswork</div>
+        <p class="how-step-desc">Log your sessions. The system tracks what you've sent, identifies what's stopping you from the next grade, and surfaces the exact routes that fill your weaknesses.</p>
+        <span class="how-step-tag" style="color:var(--amber);background:rgba(245,176,0,0.08);border-color:rgba(245,176,0,0.15);">Gets smarter over time</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<div id="features"></div>
+
+<!-- FEATURE 1: PERSONAL GRADE -->
+<section class="feature-personal">
+  <div class="split">
+    <div>
+      <div class="section-eyebrow">Personal Difficulty Score</div>
+      <h2 class="section-title">The same V6 is not the same for everyone</h2>
+      <p class="section-sub">Tall climbers blow through reach-dependent V6s and struggle on compression problems. Short climbers are the opposite. Your wingspan, height, and weight change what every route actually feels like. We model that.</p>
+      <ul style="margin-top:32px;list-style:none;display:flex;flex-direction:column;gap:14px;">
+        <li style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:6px;"></span>
+          <span style="font-size:14px;color:rgba(236,239,237,0.7);line-height:1.6;">Enter your height, wingspan, and weight — nothing else required to start</span>
+        </li>
+        <li style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:6px;"></span>
+          <span style="font-size:14px;color:rgba(236,239,237,0.7);line-height:1.6;">Every predicted grade gets a 1–10 personal score showing how hard it is <em>for your body</em></span>
+        </li>
+        <li style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:6px;"></span>
+          <span style="font-size:14px;color:rgba(236,239,237,0.7);line-height:1.6;">Log sends to refine your move affinity profile over time</span>
+        </li>
+      </ul>
+    </div>
+    <div class="pd-card">
+      <div class="pd-card-label">Personal Difficulty Score</div>
+      <div class="pd-score-display">
+        <span class="pd-score-big">7.3</span>
+        <span class="pd-score-max">/ 10</span>
+      </div>
+      <div class="pd-score-label" style="color:var(--mist);font-size:12px;margin-bottom:12px;">Taller Than Average — Reach-Dependent Route</div>
+      <div class="pd-bar-track"><div class="pd-bar-fill"></div></div>
+      <div class="pd-ticks"><span>1</span><span>3</span><span>5</span><span>7</span><span>9</span></div>
+      <div style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:6px;">
+          <span style="color:var(--mist);">vs. community grade V6</span>
+          <span style="color:var(--amber);font-family:var(--mono);font-size:10px;font-weight:700;">+0.8 harder for you</span>
+        </div>
+        <div style="font-size:11px;color:var(--mist2);line-height:1.5;">Crux move requires cross-body compression — your wingspan of 185cm works against you here</div>
+      </div>
+      <div class="pd-body-stats">
+        <div class="pd-stat">
+          <span class="pd-stat-val">183cm</span>
+          <span class="pd-stat-lbl">Height</span>
+        </div>
+        <div class="pd-stat">
+          <span class="pd-stat-val">+4cm</span>
+          <span class="pd-stat-lbl">Ape Index</span>
+        </div>
+        <div class="pd-stat">
+          <span class="pd-stat-val">V6</span>
+          <span class="pd-stat-lbl">On-sight</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURE 2: ROUTE GENERATOR -->
+<section class="feature-generator">
+  <div class="split reverse">
+    <div>
+      <div class="section-eyebrow">AI Route Generator</div>
+      <h2 class="section-title">Generate exactly the route you need to climb today</h2>
+      <p class="section-sub">Pick a target grade. Choose your board angle. The ML model scores all 628K routes and surfaces the ones that match your goal difficulty — not the community consensus grade.</p>
+      <ul style="margin-top:32px;list-style:none;display:flex;flex-direction:column;gap:14px;">
+        <li style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:6px;"></span>
+          <span style="font-size:14px;color:rgba(236,239,237,0.7);line-height:1.6;">Target any V-grade — not just community-graded problems</span>
+        </li>
+        <li style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:6px;"></span>
+          <span style="font-size:14px;color:rgba(236,239,237,0.7);line-height:1.6;">Beta preview: animated stick figure shows the intended sequence before you step on</span>
+        </li>
+        <li style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:6px;"></span>
+          <span style="font-size:14px;color:rgba(236,239,237,0.7);line-height:1.6;">Route DNA breakdown: reach, power, lateral movement, complexity — know what you're getting into</span>
+        </li>
+      </ul>
+    </div>
+    <div class="gen-card">
+      <div class="gen-header">
+        <div class="gen-dot" style="background:#FF5C3A;"></div>
+        <div class="gen-dot" style="background:#F5B000;"></div>
+        <div class="gen-dot" style="background:#1EE07A;"></div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--mist);margin-left:8px;letter-spacing:0.08em;">ROUTE GENERATOR — 40°</span>
+      </div>
+      <div class="gen-grades">
+        <div class="gen-grade-pill">V3</div>
+        <div class="gen-grade-pill">V4</div>
+        <div class="gen-grade-pill">V5</div>
+        <div class="gen-grade-pill active">V6</div>
+        <div class="gen-grade-pill">V7</div>
+        <div class="gen-grade-pill">V8</div>
+        <div class="gen-grade-pill" style="color:var(--mist2);border-color:rgba(255,255,255,0.04);">Freeform</div>
+      </div>
+      <div class="gen-route-list">
+        <div class="gen-route">
+          <div class="gen-route-grade" style="background:rgba(0,229,200,0.1);color:var(--teal);">V6</div>
+          <span class="gen-route-name">Midnight Traverse</span>
+          <span class="gen-route-meta">6 holds · 94 sends</span>
+          <span class="gen-route-pd">7.3</span>
+        </div>
+        <div class="gen-route" style="background:rgba(255,255,255,0.015);">
+          <div class="gen-route-grade" style="background:rgba(0,229,200,0.1);color:var(--teal);">V6</div>
+          <span class="gen-route-name">Crossfire</span>
+          <span class="gen-route-meta">7 holds · 211 sends</span>
+          <span class="gen-route-pd">6.8</span>
+        </div>
+        <div class="gen-route">
+          <div class="gen-route-grade" style="background:rgba(245,176,0,0.1);color:var(--amber);">V7</div>
+          <span class="gen-route-name">Upper Deck</span>
+          <span class="gen-route-meta">8 holds · 57 sends</span>
+          <span class="gen-route-pd">6.1</span>
+        </div>
+        <div class="gen-route">
+          <div class="gen-route-grade" style="background:rgba(0,229,200,0.1);color:var(--teal);">V6</div>
+          <span class="gen-route-name">Left Out</span>
+          <span class="gen-route-meta">5 holds · 408 sends</span>
+          <span class="gen-route-pd">7.9</span>
+        </div>
+      </div>
+      <div class="gen-footer">
+        <span style="font-size:11px;color:var(--mist);font-family:var(--mono);">4 routes matched · sorted by relevance</span>
+        <button class="gen-generate-btn">GENERATE NEW</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURE 3: VIDEO COACH -->
+<section class="feature-coach" id="coach">
+  <div class="split">
+    <div>
+      <div class="section-eyebrow">AI Video Coach</div>
+      <h2 class="section-title">Upload a clip. Know exactly what's holding you back</h2>
+      <p class="section-sub">Drop in a climbing video and get pose-extracted coaching feedback in minutes. Not generic tips — specific measurements of your tension, hip position, arm bend, and movement efficiency, with drills targeted at your actual weaknesses.</p>
+      <ul style="margin-top:32px;list-style:none;display:flex;flex-direction:column;gap:14px;">
+        <li style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:6px;"></span>
+          <span style="font-size:14px;color:rgba(236,239,237,0.7);line-height:1.6;">17-joint pose extraction at ~10fps — shoulder angles, hip position, arm extension</span>
+        </li>
+        <li style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:6px;"></span>
+          <span style="font-size:14px;color:rgba(236,239,237,0.7);line-height:1.6;">6 coaching categories: tension, straight arms, hip height, lateral movement, wasted movement, reach</span>
+        </li>
+        <li style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:6px;"></span>
+          <span style="font-size:14px;color:rgba(236,239,237,0.7);line-height:1.6;">Each issue comes with specific drills to fix it — not "climb more slabs"</span>
+        </li>
+      </ul>
+    </div>
+    <div class="coach-card">
+      <div class="coach-video-area">
+        <div class="coach-video-bg"></div>
+        <div class="coach-scanline"></div>
+        <div class="coach-overlay-text">
+          <div><span class="coach-pose-dot"></span>POSE EXTRACTION ACTIVE</div>
+          <div style="color:rgba(0,229,200,0.5);font-size:9px;">17 joints · 10fps · frame 847/1203</div>
+        </div>
+      </div>
+      <div class="coach-insights">
+        <div class="insight-item">
+          <div class="insight-score bad">4.2</div>
+          <div class="insight-body">
+            <div class="insight-title">Straight Arm Percentage — Left</div>
+            <div class="insight-desc">Your left arm locks straight on 62% of frames on the crux, forcing weight into your shoulder instead of your skeleton.</div>
+            <div class="insight-drill">→ Drill: lock-off progressions on a hangboard</div>
+          </div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-score warn">6.1</div>
+          <div class="insight-body">
+            <div class="insight-title">Hip Position</div>
+            <div class="insight-desc">Average hip height is 14cm below ideal for this angle. Dropping knees would reduce reach demand by ~8cm.</div>
+            <div class="insight-drill">→ Drill: hip-in footwork on slabs</div>
+          </div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-score good">8.7</div>
+          <div class="insight-body">
+            <div class="insight-title">Core Tension</div>
+            <div class="insight-desc">Excellent mid-body rigidity throughout the sequence. Your tension score is in the top 15% of analyzed attempts at this angle.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURE 4: ANALYTICS -->
+<section class="feature-analytics">
+  <div class="split reverse">
+    <div>
+      <div class="section-eyebrow">Training Analytics</div>
+      <h2 class="section-title">The official app has zero session data. We have all of it</h2>
+      <p class="section-sub">Track every session, see your grade distribution over time, identify which move types you keep avoiding, and watch your weaknesses shrink. Built for climbers who take training seriously.</p>
+      <ul style="margin-top:32px;list-style:none;display:flex;flex-direction:column;gap:14px;">
+        <li style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:6px;"></span>
+          <span style="font-size:14px;color:rgba(236,239,237,0.7);line-height:1.6;">Session volume, grade pyramid, move type breakdown per session</span>
+        </li>
+        <li style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:6px;"></span>
+          <span style="font-size:14px;color:rgba(236,239,237,0.7);line-height:1.6;">Benchmark system: know exactly how a V6 should feel for your current fitness</span>
+        </li>
+        <li style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:6px;"></span>
+          <span style="font-size:14px;color:rgba(236,239,237,0.7);line-height:1.6;">Personalized route recommendations based on your logged weaknesses</span>
+        </li>
+      </ul>
+    </div>
+    <div class="analytics-card">
+      <div class="analytics-header">
+        <span class="analytics-title">Session History</span>
+        <span class="analytics-period">Last 8 weeks</span>
+      </div>
+      <div class="analytics-chart">
+        <div class="chart-bar-wrap"><div class="chart-bar" style="height:35%;background:rgba(0,229,200,0.25);"></div><span class="chart-label">W1</span></div>
+        <div class="chart-bar-wrap"><div class="chart-bar" style="height:55%;background:rgba(0,229,200,0.3);"></div><span class="chart-label">W2</span></div>
+        <div class="chart-bar-wrap"><div class="chart-bar" style="height:40%;background:rgba(0,229,200,0.25);"></div><span class="chart-label">W3</span></div>
+        <div class="chart-bar-wrap"><div class="chart-bar" style="height:70%;background:rgba(0,229,200,0.35);"></div><span class="chart-label">W4</span></div>
+        <div class="chart-bar-wrap"><div class="chart-bar" style="height:60%;background:rgba(0,229,200,0.3);"></div><span class="chart-label">W5</span></div>
+        <div class="chart-bar-wrap"><div class="chart-bar" style="height:80%;background:rgba(0,229,200,0.4);"></div><span class="chart-label">W6</span></div>
+        <div class="chart-bar-wrap"><div class="chart-bar" style="height:65%;background:rgba(0,229,200,0.35);"></div><span class="chart-label">W7</span></div>
+        <div class="chart-bar-wrap"><div class="chart-bar" style="height:90%;background:linear-gradient(to top, var(--teal), #40CFC0);box-shadow:0 0 8px rgba(0,229,200,0.3);"></div><span class="chart-label">W8</span></div>
+      </div>
+      <div class="analytics-grid">
+        <div class="analytics-stat">
+          <div class="analytics-stat-num">14</div>
+          <div class="analytics-stat-lbl">Sessions logged</div>
+        </div>
+        <div class="analytics-stat">
+          <div class="analytics-stat-num">V5.8</div>
+          <div class="analytics-stat-lbl">Avg grade this month</div>
+        </div>
+        <div class="analytics-stat">
+          <div class="analytics-stat-num">+0.4</div>
+          <div class="analytics-stat-lbl" style="color:var(--green);">Grade trend ↑</div>
+        </div>
+        <div class="analytics-stat">
+          <div class="analytics-stat-num">86</div>
+          <div class="analytics-stat-lbl">Routes attempted</div>
+        </div>
+      </div>
+      <div style="margin-top:4px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--mist);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px;">Move Type Weaknesses</div>
+        <div class="weakness-row"><span class="weakness-label">Dynamic</span><div class="weakness-track"><div class="weakness-fill" style="width:28%;background:var(--coral);"></div></div><span class="weakness-val" style="color:var(--coral);">28%</span></div>
+        <div class="weakness-row"><span class="weakness-label">Lateral</span><div class="weakness-track"><div class="weakness-fill" style="width:52%;background:var(--amber);"></div></div><span class="weakness-val" style="color:var(--amber);">52%</span></div>
+        <div class="weakness-row"><span class="weakness-label">Sustained</span><div class="weakness-track"><div class="weakness-fill" style="width:74%;background:var(--teal);"></div></div><span class="weakness-val">74%</span></div>
+        <div class="weakness-row"><span class="weakness-label">Reach</span><div class="weakness-track"><div class="weakness-fill" style="width:81%;background:var(--green);"></div></div><span class="weakness-val" style="color:var(--green);">81%</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PHOTO BREAK -->
+<div class="photo-break">
+  <img src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=1800&q=70" alt="Climber on training board">
+  <div class="photo-break-overlay"></div>
+  <div class="photo-break-content">
+    <div class="photo-break-quote">
+      "The Kilter Board community built 628,000 routes.<br><span class="hl">Nobody built the tools to use them intelligently.</span>"
+    </div>
+    <div class="photo-break-source">— UNTIL NOW</div>
+  </div>
+</div>
+
+<!-- COMPARISON -->
+<section class="comparison" id="compare">
+  <div class="section-eyebrow">How we compare</div>
+  <h2 class="section-title">Every other training app is missing the point</h2>
+  <p class="section-sub">Crimpd and Lattice are great for general climbing fitness. Neither one knows what a Kilter Board is. The official app is a remote control, not a training tool.</p>
+  <div class="comparison-table">
+    <div class="comparison-row">
+      <div class="comparison-cell header-cell">Feature</div>
+      <div class="comparison-cell header-cell ours">Kilter Intelligence</div>
+      <div class="comparison-cell header-cell center">Official Kilter App</div>
+      <div class="comparison-cell header-cell center">Crimpd / Lattice</div>
+    </div>
+    <div class="comparison-row">
+      <div class="comparison-cell feature-name">ML-predicted route difficulty</div>
+      <div class="comparison-cell ours"><span class="check">✓</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+    </div>
+    <div class="comparison-row">
+      <div class="comparison-cell feature-name">Personalized grade (body metrics)</div>
+      <div class="comparison-cell ours"><span class="check">✓</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+    </div>
+    <div class="comparison-row">
+      <div class="comparison-cell feature-name">Video pose analysis + coaching</div>
+      <div class="comparison-cell ours"><span class="check">✓</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+    </div>
+    <div class="comparison-row">
+      <div class="comparison-cell feature-name">Route generation at target grade</div>
+      <div class="comparison-cell ours"><span class="check">✓</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+    </div>
+    <div class="comparison-row">
+      <div class="comparison-cell feature-name">Session analytics + tracking</div>
+      <div class="comparison-cell ours"><span class="check">✓</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+      <div class="comparison-cell center"><span class="check">✓</span></div>
+    </div>
+    <div class="comparison-row">
+      <div class="comparison-cell feature-name">Kilter Board route database</div>
+      <div class="comparison-cell ours"><span class="check">✓</span></div>
+      <div class="comparison-cell center"><span class="check">✓</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+    </div>
+    <div class="comparison-row">
+      <div class="comparison-cell feature-name">Beta animation (route preview)</div>
+      <div class="comparison-cell ours"><span class="check">✓</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+    </div>
+    <div class="comparison-row">
+      <div class="comparison-cell feature-name">Weakness identification</div>
+      <div class="comparison-cell ours"><span class="check">✓</span></div>
+      <div class="comparison-cell center"><span class="cross">—</span></div>
+      <div class="comparison-cell center"><span class="partial">Partial</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testimonials">
+  <div class="section-eyebrow">Early access feedback</div>
+  <h2 class="section-title">From climbers who actually use it</h2>
+  <div class="testimonials-grid">
+    <div class="testimonial-card">
+      <p class="testimonial-text">"The PD score finally explained something that was driving me insane. I'm 6'1" with a +5 ape index and I kept getting shut down on compression problems that everyone else was cruising. Score said 8.2/10 for me vs 6/10 average. Immediately made sense."</p>
+      <div class="testimonial-author">
+        <div class="testimonial-avatar">AR</div>
+        <div>
+          <div class="testimonial-name">Alex R.</div>
+          <div class="testimonial-grade">Projecting V8 · trains 5x/week on Kilter</div>
+        </div>
+      </div>
+    </div>
+    <div class="testimonial-card">
+      <p class="testimonial-text">"I have a home board so I train alone. No coach, no training partners. The video analysis caught that I was straight-arming through every crux move — dead giveaway I'm power-not-technique climbing. That one fix added two months of progress."</p>
+      <div class="testimonial-author">
+        <div class="testimonial-avatar">JC</div>
+        <div>
+          <div class="testimonial-name">Jordan C.</div>
+          <div class="testimonial-grade">V6 → V7 in 8 weeks · home Kilter owner</div>
+        </div>
+      </div>
+    </div>
+    <div class="testimonial-card">
+      <p class="testimonial-text">"I used to spend the first 20 minutes of every session just browsing for routes. Now I type V5, 40°, select crimp-heavy and I have a warmup circuit in 10 seconds. The session log showing my send rate by hold type was eye-opening — 34% on pinches vs 71% on jugs."</p>
+      <div class="testimonial-author">
+        <div class="testimonial-avatar">MP</div>
+        <div>
+          <div class="testimonial-name">Maya P.</div>
+          <div class="testimonial-grade">Targeting first V7 · climbs 4x/week</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing" id="pricing">
+  <div style="text-align:center;max-width:600px;margin:0 auto;">
+    <div class="section-eyebrow" style="justify-content:center;display:flex;">Pricing</div>
+    <h2 class="section-title">Simple. No gym membership required</h2>
+    <p class="section-sub" style="margin:0 auto;">Start free. Upgrade when you want the tools that actually move the needle.</p>
+  </div>
+  <div class="pricing-grid">
+    <div class="pricing-card">
+      <div class="pricing-tier">Free</div>
+      <div class="pricing-price">$0</div>
+      <div class="pricing-desc">Explore the route database and generator. No credit card.</div>
+      <ul class="pricing-features">
+        <li>628K route database</li>
+        <li>Route generator (unlimited)</li>
+        <li>Beta preview animation</li>
+        <li class="dim">Personal Difficulty Score</li>
+        <li class="dim">Video Coach</li>
+        <li class="dim">Session analytics</li>
+      </ul>
+      <a href="index.html" class="pricing-cta ghost">Get started free</a>
+    </div>
+    <div class="pricing-card featured">
+      <div class="pricing-tier">Climber Pro</div>
+      <div class="pricing-price">$8<span>/mo</span></div>
+      <div class="pricing-desc">Everything serious training requires.</div>
+      <ul class="pricing-features">
+        <li>Everything in Free</li>
+        <li>Grade Passport — see how your gym compares to Kilter standard</li>
+        <li>Personal Difficulty Score (1–10)</li>
+        <li>Video Coach (5 uploads/mo)</li>
+        <li>Session analytics &amp; weakness identification</li>
+        <li>Personalized training recommendations</li>
+      </ul>
+      <a href="index.html" class="pricing-cta primary">Start 14-day free trial</a>
+    </div>
+    <div class="pricing-card">
+      <div class="pricing-tier">Coach</div>
+      <div class="pricing-price">$25<span>/mo</span></div>
+      <div class="pricing-desc">For coaches working with multiple climbers.</div>
+      <ul class="pricing-features">
+        <li>Everything in Pro</li>
+        <li>Unlimited video uploads</li>
+        <li>Client management</li>
+        <li>Exportable coaching reports</li>
+        <li>API access</li>
+      </ul>
+      <a href="index.html" class="pricing-cta ghost">Contact us</a>
+    </div>
+  </div>
+</section>
+
+<!-- WAITLIST -->
+<section id="waitlist" style="padding:100px 24px;background:var(--bg2);border-top:1px solid var(--border);">
+  <div style="max-width:520px;margin:0 auto;text-align:center;">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:var(--teal);margin-bottom:16px;font-weight:600;">Early Access</div>
+    <h2 style="font-size:clamp(28px,5vw,42px);font-weight:800;line-height:1.1;margin-bottom:14px;">Get a free Pro trial<br>at launch</h2>
+    <p style="font-size:16px;color:var(--mist);line-height:1.6;margin-bottom:32px;">Join the waitlist — be first to know when Pro features go live, and get 30 days free.</p>
+    <div id="waitlist-count-wrap" style="margin-bottom:24px;font-size:13px;color:var(--mist);">
+      <span id="waitlist-count" style="color:var(--teal);font-weight:700;font-family:var(--mono);">…</span> climbers already on the list
+    </div>
+    <form id="waitlist-form" onsubmit="submitWaitlist(event)" style="display:flex;gap:10px;max-width:420px;margin:0 auto;">
+      <input id="waitlist-email" type="email" placeholder="your@email.com" required
+        style="flex:1;padding:14px 16px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--white);font-size:14px;outline:none;transition:border-color 0.2s;"
+        onfocus="this.style.borderColor='var(--teal)'" onblur="this.style.borderColor='var(--border)'">
+      <button type="submit"
+        style="padding:14px 20px;background:var(--teal);color:#000;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity 0.15s;"
+        onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">Join List</button>
+    </form>
+    <div id="waitlist-msg" style="margin-top:14px;font-size:13px;min-height:18px;"></div>
+    <div style="margin-top:20px;font-size:11px;color:var(--mist2);">No spam. Unsubscribe anytime.</div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final-cta">
+  <div class="final-cta-bg"></div>
+  <div class="final-cta-glow"></div>
+  <div class="final-cta-content">
+    <h2 class="final-cta-title">
+      Your next grade is<br>
+      <span style="background:linear-gradient(135deg,var(--teal),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">already on the board</span>
+    </h2>
+    <p class="final-cta-sub">You just need to know which route it is, and what's stopping you from sending it.</p>
+    <a href="index.html" class="btn-primary" style="font-size:16px;padding:16px 36px;">Open the App — It's Free</a>
+    <div class="final-cta-note">No account required to start · Upgrade anytime</div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Kilter / Intelligence</div>
+  <div class="footer-links">
+    <a href="index.html">App</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+  </div>
+  <div class="footer-copy">© 2026 · Built for Kilter Board climbers</div>
+</footer>
+
+<script>
+// ── Nav scroll shadow ──
+(function() {
+  const nav = document.querySelector('.nav');
+  if (!nav) return;
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 20) {
+      nav.style.boxShadow = '0 1px 40px rgba(0,0,0,0.5)';
+      nav.style.background = 'rgba(6,10,13,0.96)';
+    } else {
+      nav.style.boxShadow = '';
+      nav.style.background = 'rgba(6,10,13,0.85)';
+    }
+  }, { passive: true });
+})();
+
+// ── Scroll reveal ──
+(function() {
+  const sel = '.pd-card,.gen-card,.coach-card,.analytics-card,.how-step,.testimonial-card,.pricing-card,.comparison-table,.stat-item';
+  document.querySelectorAll(sel).forEach(el => el.classList.add('reveal'));
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll(sel).forEach(el => io.observe(el));
+})();
+</script>
+<script>
+/* ── Landing page physics animation v2 ── */
+(function() {
+  'use strict';
+  const canvas = document.getElementById('landing-physics');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const TAU = Math.PI * 2;
+
+  const C_BG    = '#060C12';
+  const C_TEAL  = [0,229,200];
+  const C_PURP  = [155,109,255];
+  const C_AMBER = [245,176,0];
+  const C_GREEN = [30,224,122];
+  const C_WHITE = [236,239,237];
+  const C_CORAL = [255,92,58];
+
+  function rgb(c, a) { return `rgba(${c[0]},${c[1]},${c[2]},${a})`; }
+  function lerp(a, b, k) { return a + (b - a) * k; }
+  function clamp(v,lo,hi) { return Math.max(lo, Math.min(hi, v)); }
+  function dist2(a, b) { const dx=a.x-b.x,dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
+
+  let W, H;
+  function resize() {
+    W = canvas.width  = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+  resize();
+
+  // ── Hold layout (normalized 0–1) — authentic Kilter-style grid ──
+  const HOLD_POS = [
+    // row 0 (top)
+    [0.13,0.09],[0.31,0.07],[0.52,0.11],[0.70,0.08],[0.87,0.12],
+    // row 1
+    [0.05,0.26],[0.24,0.23],[0.43,0.28],[0.62,0.24],[0.80,0.27],[0.95,0.25],
+    // row 2
+    [0.16,0.44],[0.35,0.41],[0.54,0.46],[0.73,0.42],[0.90,0.45],
+    // row 3
+    [0.08,0.61],[0.27,0.58],[0.46,0.63],[0.65,0.60],[0.83,0.62],
+    // row 4 (bottom)
+    [0.18,0.80],[0.38,0.78],[0.57,0.82],[0.76,0.79],[0.91,0.81],
+  ];
+
+  // ── Multiple routes (cycles every ~16s) ──
+  const ROUTES = [
+    { holds:[23,18,14,9,4],   grade:'V5', angle:'40°', color:C_TEAL  },
+    { holds:[22,17,11,6,1],   grade:'V4', angle:'35°', color:C_PURP  },
+    { holds:[24,19,15,10,3],  grade:'V6', angle:'45°', color:C_AMBER },
+  ];
+  let routeIdx = 0;
+  let routeTimer = 0;
+  const ROUTE_DUR = 16;
+  let ROUTE = ROUTES[0].holds;
+  let hudGrade = ROUTES[0].grade;
+  let hudConf  = 0;  // animates to 94
+  let hudMatch = 0;  // animates to 87
+  let routeColor = C_TEAL;
+
+  let holds = [];
+  function buildHolds() {
+    holds = HOLD_POS.map(([fx,fy], i) => ({
+      fx, fy,
+      x: fx * W,
+      y: fy * H,
+      r: 5 + (ROUTE.includes(i) ? 2 : 0),
+      onRoute: ROUTE.includes(i),
+      lit: 0,
+      role: ROUTE[0]===i ? 'start' : ROUTE[ROUTE.length-1]===i ? 'finish' : 'hand',
+    }));
+  }
+  buildHolds();
+
+  // ── Stick figure joints ──
+  const JOINTS = ['head','neck','lSh','rSh','hip','lElb','rElb','lWr','rWr','lKn','rKn','lAn','rAn'];
+  const fig = {};
+  JOINTS.forEach(j => { fig[j] = { x: W/2, y: H/2 }; });
+
+  function makePoses() {
+    const h = i => ({ x: holds[i].x, y: holds[i].y });
+    return [
+      () => {
+        const lh=h(ROUTE[0]), rh=h(ROUTE[1]);
+        const hipX=(lh.x+rh.x)/2, hipY=Math.min(lh.y,rh.y)-10;
+        return { lWr:lh, rWr:rh, lAn:{x:lh.x+8,y:lh.y+65}, rAn:{x:rh.x-8,y:rh.y+65},
+                 hip:{x:hipX,y:hipY+18}, lKn:{x:lh.x+4,y:lh.y+38}, rKn:{x:rh.x-4,y:rh.y+38},
+                 neck:{x:hipX,y:hipY-42}, head:{x:hipX,y:hipY-60},
+                 lSh:{x:hipX-18,y:hipY-40}, rSh:{x:hipX+18,y:hipY-40},
+                 lElb:{x:(lh.x+hipX-18)/2,y:(lh.y+hipY-40)/2+5},
+                 rElb:{x:(rh.x+hipX+18)/2,y:(rh.y+hipY-40)/2+5} };
+      },
+      () => {
+        const lh=h(ROUTE[1]), rh=h(ROUTE[2]);
+        const hipX=(lh.x+rh.x)/2+6, hipY=(lh.y+rh.y)/2+22;
+        return { lWr:lh, rWr:rh, lAn:{x:lh.x+10,y:lh.y+90}, rAn:{x:rh.x-10,y:rh.y+90},
+                 hip:{x:hipX,y:hipY}, lKn:{x:lh.x+6,y:lh.y+50}, rKn:{x:rh.x-8,y:rh.y+48},
+                 neck:{x:hipX,y:hipY-55}, head:{x:hipX,y:hipY-73},
+                 lSh:{x:hipX-20,y:hipY-52}, rSh:{x:hipX+20,y:hipY-52},
+                 lElb:{x:(lh.x+hipX-20)/2,y:(lh.y+hipY-52)/2},
+                 rElb:{x:(rh.x+hipX+20)/2,y:(rh.y+hipY-52)/2} };
+      },
+      () => {
+        const lh=h(ROUTE[2]), rh=h(ROUTE[3]);
+        const hipX=(lh.x+rh.x)/2, hipY=(lh.y+rh.y)/2+30;
+        return { lWr:lh, rWr:rh, lAn:{x:lh.x+12,y:lh.y+95}, rAn:{x:rh.x-12,y:rh.y+95},
+                 hip:{x:hipX,y:hipY}, lKn:{x:lh.x+8,y:lh.y+52}, rKn:{x:rh.x-8,y:rh.y+52},
+                 neck:{x:hipX,y:hipY-58}, head:{x:hipX-4,y:hipY-76},
+                 lSh:{x:hipX-20,y:hipY-55}, rSh:{x:hipX+20,y:hipY-55},
+                 lElb:{x:(lh.x+hipX-20)/2+4,y:(lh.y+hipY-55)/2-6},
+                 rElb:{x:(rh.x+hipX+20)/2-4,y:(rh.y+hipY-55)/2-6} };
+      },
+      () => {
+        const lh=h(ROUTE[3]), rh=h(ROUTE[4]);
+        const hipX=(lh.x+rh.x)/2, hipY=(lh.y+rh.y)/2+28;
+        return { lWr:lh, rWr:rh, lAn:{x:lh.x+14,y:lh.y+88}, rAn:{x:rh.x-14,y:rh.y+88},
+                 hip:{x:hipX,y:hipY}, lKn:{x:lh.x+7,y:lh.y+48}, rKn:{x:rh.x-7,y:rh.y+48},
+                 neck:{x:hipX,y:hipY-55}, head:{x:hipX+4,y:hipY-73},
+                 lSh:{x:hipX-18,y:hipY-52}, rSh:{x:hipX+18,y:hipY-52},
+                 lElb:{x:(lh.x+hipX-18)/2,y:(lh.y+hipY-52)/2-8},
+                 rElb:{x:(rh.x+hipX+18)/2,y:(rh.y+hipY-52)/2-8} };
+      },
+    ];
+  }
+
+  let poseBuilders;
+  let poseIdx = 0;
+  let poseTimer = 0;
+  const POSE_DUR = 3.8;
+  const SPRING_K = 0.055;
+
+  function initFig() {
+    poseBuilders = makePoses();
+    const p = poseBuilders[0]();
+    Object.keys(p).forEach(k => { if (fig[k]) { fig[k].x=p[k].x; fig[k].y=p[k].y; } });
+  }
+
+  // ── Grade pills ──
+  const GRADE_SETS = [['V3','V4','V5'],['V3','V4'],['V5','V6','V7']];
+  const pills = [];
+  let pillTimer = 0;
+  const PILL_INTERVAL = 1.6;
+
+  function spawnPill() {
+    const hi = ROUTE[Math.floor(Math.random() * ROUTE.length)];
+    const h = holds[hi];
+    const grades = GRADE_SETS[routeIdx % GRADE_SETS.length];
+    pills.push({
+      x: h.x + (Math.random()-0.5)*22,
+      y: h.y,
+      vy: -1.5 - Math.random()*0.8,
+      vx: (Math.random()-0.5)*0.5,
+      a: 0, scale: 0,
+      text: grades[Math.floor(Math.random()*grades.length)],
+      col: routeColor,
+    });
+  }
+
+  // ── Particles ──
+  const particles = Array.from({length:28}, () => ({
+    x: Math.random(), y: Math.random(),
+    vx: (Math.random()-0.5)*0.00018,
+    vy: (Math.random()-0.5)*0.00018,
+    r: Math.random()*1.1+0.3,
+    a: Math.random()*0.2+0.04,
+    col: Math.random()>0.55 ? C_TEAL : C_PURP,
+  }));
+
+  // ── Route path dot ──
+  let pathT = 0;
+
+  // ── Scanline state ──
+  let scanY = -1; // normalized 0–1, -1 = idle
+  let scanTimer = 0;
+  const SCAN_INTERVAL = 5.5;
+
+  // ── Update ──
+  function update(dt) {
+    // Route cycling
+    routeTimer += dt;
+    if (routeTimer >= ROUTE_DUR) {
+      routeTimer = 0;
+      routeIdx = (routeIdx + 1) % ROUTES.length;
+      ROUTE = ROUTES[routeIdx].holds;
+      hudGrade = ROUTES[routeIdx].grade;
+      routeColor = ROUTES[routeIdx].color;
+      hudConf = 0; hudMatch = 0;
+      buildHolds();
+      poseIdx = 0; poseTimer = 0;
+      poseBuilders = makePoses();
+      initFig();
+    }
+
+    // Pose
+    poseTimer += dt;
+    if (poseTimer >= POSE_DUR) { poseTimer=0; poseIdx=(poseIdx+1)%poseBuilders.length; }
+    const target = poseBuilders[poseIdx]();
+    JOINTS.forEach(j => {
+      if (target[j]) { fig[j].x=lerp(fig[j].x,target[j].x,SPRING_K); fig[j].y=lerp(fig[j].y,target[j].y,SPRING_K); }
+    });
+
+    // Hold glow
+    const activeHolds = new Set([ROUTE[poseIdx%ROUTE.length], ROUTE[(poseIdx+1)%ROUTE.length]]);
+    holds.forEach((h, i) => {
+      const want = h.onRoute ? (activeHolds.has(i) ? 1.0 : 0.4) : 0;
+      h.lit = lerp(h.lit, want, 0.04);
+    });
+
+    // Particles
+    particles.forEach(p => {
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0)p.x=1; if(p.x>1)p.x=0;
+      if(p.y<0)p.y=1; if(p.y>1)p.y=0;
+    });
+
+    // Path dot
+    pathT = (pathT + dt * 0.1) % 1;
+
+    // Pills
+    pillTimer += dt;
+    if (pillTimer >= PILL_INTERVAL) { spawnPill(); pillTimer=0; }
+    for (let i=pills.length-1; i>=0; i--) {
+      const p=pills[i];
+      p.y+=p.vy; p.x+=p.vx; p.vy-=0.028;
+      p.a=Math.min(1,p.a+0.09); p.scale=Math.min(1,p.scale+0.07);
+      if(p.vy>-0.08) p.a-=0.035;
+      if(p.a<=0) pills.splice(i,1);
+    }
+
+    // HUD confidence / match animate up
+    hudConf  = Math.min(94,  hudConf  + dt * 18);
+    hudMatch = Math.min(87,  hudMatch + dt * 15);
+
+    // Scanline
+    scanTimer += dt;
+    if (scanTimer >= SCAN_INTERVAL) { scanTimer=0; scanY=0; }
+    if (scanY >= 0) {
+      scanY += dt * 0.55;
+      if (scanY > 1.1) scanY = -1;
+    }
+  }
+
+  // ── Draw helpers ──
+  function rrect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+    ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+    ctx.closePath();
+  }
+
+  function line(a, b, col, lw) {
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+    ctx.strokeStyle=col; ctx.lineWidth=lw; ctx.stroke();
+  }
+
+  // Quadratic bezier point
+  function bezierPt(ax,ay,cpx,cpy,bx,by,t) {
+    const u=1-t;
+    return { x:u*u*ax+2*u*t*cpx+t*t*bx, y:u*u*ay+2*u*t*cpy+t*t*by };
+  }
+
+  // ── Draw ──
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+
+    // Background
+    ctx.fillStyle=C_BG;
+    rrect(0,0,W,H,14);
+    ctx.fill();
+
+    // Board dot grid texture
+    ctx.fillStyle='rgba(255,255,255,0.022)';
+    const gsp=32;
+    for(let gx=gsp; gx<W; gx+=gsp)
+      for(let gy=gsp; gy<H; gy+=gsp) {
+        ctx.beginPath(); ctx.arc(gx,gy,0.8,0,TAU); ctx.fill();
+      }
+
+    // Board corner bolt markers
+    const bm = 18, bl = 12;
+    ctx.strokeStyle='rgba(255,255,255,0.13)';
+    ctx.lineWidth=1.2;
+    const corners = [[bm,bm],[W-bm,bm],[bm,H-bm],[W-bm,H-bm]];
+    corners.forEach(([cx,cy]) => {
+      const sx = cx<W/2 ? 1 : -1;
+      const sy = cy<H/2 ? 1 : -1;
+      ctx.beginPath(); ctx.moveTo(cx,cy-bl*sy); ctx.lineTo(cx,cy); ctx.lineTo(cx+bl*sx,cy);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx,cy,2.5,0,TAU);
+      ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.fill();
+    });
+
+    // Ambient glow
+    const ag=ctx.createRadialGradient(W*0.3,H*0.5,0,W*0.3,H*0.5,W*0.6);
+    ag.addColorStop(0,rgb(routeColor,0.04)); ag.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=ag; ctx.fillRect(0,0,W,H);
+
+    // Particles
+    particles.forEach(p => {
+      ctx.globalAlpha=p.a;
+      ctx.beginPath(); ctx.arc(p.x*W,p.y*H,p.r,0,TAU);
+      ctx.fillStyle=rgb(p.col,1); ctx.fill();
+    });
+    ctx.globalAlpha=1;
+
+    // Route bezier paths
+    ctx.lineCap='round';
+    for(let ri=0; ri<ROUTE.length-1; ri++) {
+      const a=holds[ROUTE[ri]], b=holds[ROUTE[ri+1]];
+      const cpx=(a.x+b.x)/2, cpy=(a.y+b.y)/2 - 22;
+      const grad=ctx.createLinearGradient(a.x,a.y,b.x,b.y);
+      grad.addColorStop(0,rgb(routeColor,0.4));
+      grad.addColorStop(1,rgb(C_PURP,0.35));
+      ctx.strokeStyle=grad; ctx.lineWidth=1.8;
+      ctx.beginPath(); ctx.moveTo(a.x,a.y);
+      ctx.quadraticCurveTo(cpx,cpy,b.x,b.y); ctx.stroke();
+
+      // Direction arrow at midpoint
+      const mp=bezierPt(a.x,a.y,cpx,cpy,b.x,b.y,0.5);
+      const ep=bezierPt(a.x,a.y,cpx,cpy,b.x,b.y,0.55);
+      const ang=Math.atan2(ep.y-mp.y,ep.x-mp.x);
+      const al=5;
+      ctx.save(); ctx.translate(mp.x,mp.y); ctx.rotate(ang);
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-al,-al*0.6); ctx.moveTo(0,0); ctx.lineTo(-al,al*0.6);
+      ctx.strokeStyle=rgb(routeColor,0.5); ctx.lineWidth=1.2; ctx.stroke();
+      ctx.restore();
+    }
+
+    // Traveling dot (along bezier)
+    {
+      const totalSegs=ROUTE.length-1;
+      const prog=pathT*totalSegs;
+      const seg=Math.floor(prog), t=prog-seg;
+      if(seg<totalSegs) {
+        const a=holds[ROUTE[seg]], b=holds[ROUTE[seg+1]];
+        const cpx=(a.x+b.x)/2, cpy=(a.y+b.y)/2-22;
+        const pt=bezierPt(a.x,a.y,cpx,cpy,b.x,b.y,t);
+        const tG=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,12);
+        tG.addColorStop(0,rgb(routeColor,0.9)); tG.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.beginPath(); ctx.arc(pt.x,pt.y,12,0,TAU); ctx.fillStyle=tG; ctx.fill();
+        ctx.beginPath(); ctx.arc(pt.x,pt.y,3.5,0,TAU);
+        ctx.fillStyle=rgb(routeColor,1);
+        ctx.shadowColor=rgb(routeColor,0.9); ctx.shadowBlur=8;
+        ctx.fill(); ctx.shadowBlur=0;
+      }
+    }
+
+    // Holds
+    holds.forEach((h,i) => {
+      const la=h.lit;
+      const isRoute=h.onRoute;
+      const hCol=isRoute ? (i===ROUTE[0] ? C_GREEN : i===ROUTE[ROUTE.length-1] ? C_CORAL : routeColor) : C_PURP;
+
+      if(la>0.04) {
+        const rad=ctx.createRadialGradient(h.x,h.y,0,h.x,h.y,h.r*8);
+        rad.addColorStop(0,rgb(hCol,0.15*la)); rad.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.beginPath(); ctx.arc(h.x,h.y,h.r*8,0,TAU); ctx.fillStyle=rad; ctx.fill();
+      }
+
+      // Hold body
+      ctx.beginPath(); ctx.arc(h.x,h.y,h.r,0,TAU);
+      ctx.fillStyle = la>0.04
+        ? rgb(hCol, 0.22+la*0.7)
+        : 'rgba(255,255,255,0.09)';
+      if(la>0.04) { ctx.shadowColor=rgb(hCol,0.9); ctx.shadowBlur=10*la; }
+      ctx.fill(); ctx.shadowBlur=0;
+
+      // Ring
+      ctx.beginPath(); ctx.arc(h.x,h.y,h.r+2.5,0,TAU);
+      ctx.strokeStyle=la>0.04 ? rgb(hCol,0.45*la) : 'rgba(255,255,255,0.05)';
+      ctx.lineWidth=1; ctx.stroke();
+
+      // Role label (start/finish)
+      if(isRoute && (i===ROUTE[0]||i===ROUTE[ROUTE.length-1])) {
+        ctx.fillStyle=rgb(i===ROUTE[0]?C_GREEN:C_CORAL, 0.6+la*0.4);
+        ctx.font="bold 7px 'Space Mono',monospace";
+        ctx.textAlign='center'; ctx.textBaseline='bottom';
+        ctx.fillText(i===ROUTE[0]?'S':'T', h.x, h.y-h.r-5);
+      }
+    });
+
+    // Stick figure — tension-colored limbs
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    const figBase='rgba(236,239,237,0.78)';
+
+    // Tension: how close wrist is to any route hold
+    function tension(joint) {
+      let best=0;
+      ROUTE.forEach(ri => {
+        const d=dist2(fig[joint],holds[ri]);
+        best=Math.max(best,clamp(1-d/40,0,1));
+      });
+      return best;
+    }
+    const lt=tension('lWr'), rt2=tension('rWr');
+
+    const lArmC = lt>0.3 ? rgb(routeColor, 0.7+lt*0.3) : figBase;
+    const rArmC = rt2>0.3 ? rgb(routeColor, 0.7+rt2*0.3) : figBase;
+
+    const segs=[
+      [fig.lWr,fig.lElb,lArmC,2.2],[fig.lElb,fig.lSh,lArmC,2.2],
+      [fig.rWr,fig.rElb,rArmC,2.2],[fig.rElb,fig.rSh,rArmC,2.2],
+      [fig.lSh,fig.neck,figBase,2.6],[fig.rSh,fig.neck,figBase,2.6],
+      [fig.neck,fig.hip,figBase,2.8],
+      [fig.hip,fig.lKn,figBase,2.2],[fig.lKn,fig.lAn,figBase,2.2],
+      [fig.hip,fig.rKn,figBase,2.2],[fig.rKn,fig.rAn,figBase,2.2],
+    ];
+    segs.forEach(([a,b,c,lw])=>line(a,b,c,lw));
+
+    // Head
+    ctx.beginPath(); ctx.arc(fig.head.x,fig.head.y,8.5,0,TAU);
+    ctx.fillStyle='rgba(255,255,255,0.10)';
+    ctx.strokeStyle='rgba(236,239,237,0.75)'; ctx.lineWidth=1.6;
+    ctx.fill(); ctx.stroke();
+
+    // Wrist grip dots
+    [fig.lWr,fig.rWr].forEach(w => {
+      ctx.beginPath(); ctx.arc(w.x,w.y,5,0,TAU);
+      ctx.fillStyle=rgb(routeColor,0.95);
+      ctx.shadowColor=rgb(routeColor,0.8); ctx.shadowBlur=14;
+      ctx.fill(); ctx.shadowBlur=0;
+    });
+    [fig.lAn,fig.rAn].forEach(a => {
+      ctx.beginPath(); ctx.arc(a.x,a.y,3.5,0,TAU);
+      ctx.fillStyle=rgb(C_PURP,0.8); ctx.fill();
+    });
+
+    // Grade pills
+    pills.forEach(p => {
+      ctx.save(); ctx.globalAlpha=p.a*p.scale;
+      ctx.translate(p.x,p.y); ctx.scale(p.scale,p.scale);
+      const pw=36,ph=17;
+      rrect(-pw/2,-ph/2,pw,ph,5);
+      ctx.fillStyle=rgb(p.col,0.14); ctx.fill();
+      ctx.strokeStyle=rgb(p.col,0.65); ctx.lineWidth=1; ctx.stroke();
+      ctx.fillStyle=rgb(p.col,1);
+      ctx.font="bold 9px 'Space Mono',monospace";
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(p.text,0,0);
+      ctx.restore();
+    });
+
+    // Scanline sweep
+    if(scanY>=0 && scanY<1.05) {
+      const sy=scanY*H;
+      const fade=1-scanY;
+      const sg=ctx.createLinearGradient(0,sy-20,0,sy+20);
+      sg.addColorStop(0,'rgba(0,229,200,0)');
+      sg.addColorStop(0.5,rgb(routeColor,0.09*fade));
+      sg.addColorStop(1,'rgba(0,229,200,0)');
+      ctx.fillStyle=sg; ctx.fillRect(0,sy-20,W,40);
+      ctx.strokeStyle=rgb(routeColor,0.18*fade);
+      ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(0,sy); ctx.lineTo(W,sy); ctx.stroke();
+    }
+
+    // ── AI HUD panel (bottom-right) ──
+    const hx=W-152, hy=H-116, hw=138, hh=100;
+    ctx.save();
+    ctx.fillStyle='rgba(6,10,13,0.82)';
+    rrect(hx,hy,hw,hh,8); ctx.fill();
+    ctx.strokeStyle=rgb(routeColor,0.22);
+    ctx.lineWidth=1; ctx.stroke();
+
+    // HUD header
+    ctx.fillStyle=rgb(routeColor,0.5);
+    ctx.font="bold 7px 'Space Mono',monospace";
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillText('KILTER // AI ANALYSIS',hx+10,hy+9);
+
+    // Separator
+    ctx.strokeStyle=rgb(routeColor,0.12);
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(hx+8,hy+21); ctx.lineTo(hx+hw-8,hy+21); ctx.stroke();
+
+    // Grade prediction
+    ctx.fillStyle='rgba(236,239,237,0.35)';
+    ctx.font="7px 'Space Mono',monospace";
+    ctx.fillText('PREDICTED GRADE',hx+10,hy+27);
+    ctx.fillStyle=rgb(routeColor,0.95);
+    ctx.font="bold 20px 'Space Mono',monospace";
+    ctx.fillText(hudGrade,hx+10,hy+36);
+
+    // Confidence bar
+    ctx.fillStyle='rgba(255,255,255,0.06)';
+    rrect(hx+10,hy+60,hw-20,5,2); ctx.fill();
+    const confW=(hw-20)*(hudConf/100);
+    const cg=ctx.createLinearGradient(hx+10,0,hx+10+confW,0);
+    cg.addColorStop(0,rgb(routeColor,0.8)); cg.addColorStop(1,rgb(C_PURP,0.6));
+    ctx.fillStyle=cg;
+    rrect(hx+10,hy+60,confW,5,2); ctx.fill();
+
+    ctx.fillStyle='rgba(236,239,237,0.35)';
+    ctx.font="7px 'Space Mono',monospace";
+    ctx.fillText('CONFIDENCE',hx+10,hy+54);
+    ctx.textAlign='right';
+    ctx.fillStyle=rgb(routeColor,0.75);
+    ctx.fillText(Math.round(hudConf)+'%',hx+hw-10,hy+54);
+
+    // Body match row
+    ctx.textAlign='left';
+    ctx.fillStyle='rgba(236,239,237,0.3)';
+    ctx.fillText('BODY MATCH',hx+10,hy+76);
+    ctx.textAlign='right';
+    ctx.fillStyle=rgb(C_GREEN,0.7);
+    ctx.fillText(Math.round(hudMatch)+'%',hx+hw-10,hy+76);
+
+    // Angle badge
+    ctx.textAlign='left';
+    ctx.fillStyle=rgb(C_PURP,0.6);
+    ctx.fillText(ROUTES[routeIdx].angle,hx+10,hy+88);
+
+    ctx.restore();
+
+    // Route label (top-left)
+    ctx.fillStyle=rgb(routeColor,0.28);
+    ctx.font="8px 'Space Mono',monospace";
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillText('AI ROUTE #'+String(40000+routeIdx*7+Math.round(pathT*999)).padStart(5,'0'), 16, 16);
+    ctx.fillStyle=rgb(C_PURP,0.22);
+    ctx.fillText(ROUTES[routeIdx].grade+' · '+ROUTES[routeIdx].angle, 16, 27);
+  }
+
+  // ── Animation loop ──
+  let last=0;
+  function loop(now) {
+    const dt=Math.min((now-last)/1000,0.05); last=now;
+    update(dt); draw();
+    requestAnimationFrame(loop);
+  }
+  initFig();
+  window.addEventListener('resize', ()=>{ resize(); buildHolds(); initFig(); poseBuilders=makePoses(); });
+  requestAnimationFrame(t=>{ last=t; loop(t); });
+})();
+
+// ── Scroll counter animation for stats band ──
+(function() {
+  const statNums = document.querySelectorAll('.stat-num');
+  const targets = {};
+  statNums.forEach(el => {
+    const raw = el.textContent.trim();
+    const num = parseFloat(raw.replace(/[^0-9.]/g,''));
+    if (!isNaN(num)) {
+      targets[el.dataset.countKey = Math.random()] = { el, num, suffix: raw.replace(/[\d.,]/g,''), start: null, done: false };
+    }
+  });
+
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target;
+      const key = el.dataset.countKey;
+      const t = targets[key];
+      if (!t || t.done) return;
+      t.done = true;
+      io.unobserve(el);
+      const dur = 1400;
+      function tick(now) {
+        if (!t.start) t.start = now;
+        const prog = Math.min((now - t.start) / dur, 1);
+        const ease = 1 - Math.pow(1-prog,3);
+        const val = t.num * ease;
+        let display;
+        if (t.num >= 10000) display = Math.round(val).toLocaleString();
+        else if (t.num < 10) display = val.toFixed(1);
+        else display = Math.round(val);
+        el.textContent = display + t.suffix;
+        if (prog < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }, { threshold: 0.3 });
+
+  statNums.forEach(el => io.observe(el));
+})();
+</script>
+<script>
+// Waitlist
+(function() {
+  var API = window.location.hostname === 'localhost' ? 'http://localhost:5001' : '';
+  var ref = new URLSearchParams(window.location.search).get('ref') || '';
+
+  // Load count
+  fetch(API + '/api/waitlist/count')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var el = document.getElementById('waitlist-count');
+      if (el && d.count != null) el.textContent = Number(d.count).toLocaleString();
+    })
+    .catch(function() {});
+
+  window.submitWaitlist = function(e) {
+    e.preventDefault();
+    var email = document.getElementById('waitlist-email').value.trim();
+    var msg   = document.getElementById('waitlist-msg');
+    var btn   = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    btn.textContent = 'Joining…';
+
+    fetch(API + '/api/waitlist', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email: email, referrer: ref})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        msg.style.color = 'var(--teal)';
+        msg.textContent = "You're on the list! We'll email you at launch.";
+        document.getElementById('waitlist-email').value = '';
+        btn.textContent = 'Joined!';
+        // bump count locally
+        var ce = document.getElementById('waitlist-count');
+        if (ce) ce.textContent = (parseInt(ce.textContent.replace(/,/g,'')) + 1).toLocaleString();
+      } else {
+        msg.style.color = 'var(--coral)';
+        msg.textContent = d.error || 'Something went wrong.';
+        btn.disabled = false;
+        btn.textContent = 'Join List';
+      }
+    })
+    .catch(function() {
+      msg.style.color = 'var(--coral)';
+      msg.textContent = 'Network error. Try again.';
+      btn.disabled = false;
+      btn.textContent = 'Join List';
+    });
+  };
+})();
+</script>
+</body>
+</html>
