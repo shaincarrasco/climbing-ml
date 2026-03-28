@@ -25,7 +25,12 @@ VIDEO_TMPDIR = Path(tempfile.gettempdir()) / "beta_videos"
 def load_checkpoint():
     if CHECKPOINT.exists():
         with open(CHECKPOINT) as f:
-            return json.load(f)
+            cp = json.load(f)
+        # Migrate old format: completed was {attempt_id: climb_uuid} dict
+        # New format: completed is a list of URLs for easy dedup
+        if isinstance(cp.get("completed"), dict):
+            cp["completed"] = []  # old attempt_id keys are useless for URL dedup
+        return cp
     return {"completed": [], "failed": {}, "last_run": None}
 
 def save_checkpoint(cp):
